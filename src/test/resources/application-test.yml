@@ -1,0 +1,63 @@
+# Giá trị cho @ActiveProfiles("test"). Tồn tại để test KHÔNG phụ thuộc file .env của máy dev:
+# application.yml chỉ khai ${VAR} không có mặc định, nên thiếu file này thì context test vỡ trên CI.
+# Toàn bộ là giá trị giả — secret thật chỉ sống trong .env.
+server:
+  port: 0
+
+spring:
+  # spring.datasource.url được từng test class ghi đè qua @DynamicPropertySource
+  # (xem IntegrationTestBase.jdbcUrl) để mỗi bộ test có database riêng.
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3307/lopet_java_test?useUnicode=true&characterEncoding=utf8&allowPublicKeyRetrieval=true&useSSL=false&createDatabaseIfNotExist=true
+    username: root
+    password: nguyenvu
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+  mail:
+    host: localhost
+    port: 3025
+    username: test@lopet.local
+    password: test
+
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 500MB
+
+lopet:
+  jwt:
+    access-token-secret: test-access-secret-23by
+    refresh-token-secret: test-refresh-secret-24by
+    access-token-expires-in: 3600
+    refresh-token-expires-in: 36000
+
+  cors:
+    allowed-origins: '*'
+
+  cloudinary:
+    cloud-name: test-cloud
+    api-key: test-key
+    api-secret: test-secret
+
+  mail:
+    admin-receiver: admin@lopet.local
+
+  # Để trống ba biến này là có chủ đích: AdminInitializer bỏ qua khi cấu hình rỗng, nên test không
+  # tạo tài khoản admin trong database test.
+  admin:
+    email: ''
+    username: ''
+    password: ''
+
+  socket:
+    hostname: localhost
+    port: 0
+
+logging:
+  level:
+    root: warn
+    com.nguyenvu.lopet: warn
