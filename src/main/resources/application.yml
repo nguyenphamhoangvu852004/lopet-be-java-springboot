@@ -1,0 +1,97 @@
+# Tên biến môi trường giữ trùng với example.env của lopet-be để file .env đang chạy dùng lại được.
+server:
+  port: ${APP_PORT}
+
+spring:
+  # Nạp .env ở thư mục chạy app theo định dạng properties. `optional:` để app vẫn khởi động được
+  # khi biến môi trường đã được cung cấp từ bên ngoài (docker, CI) mà không có file .env.
+  config:
+    import: optional:file:.env[.properties]
+
+  application:
+    name: lopet
+  profiles:
+    default: dev
+
+  # MYSQL on RAILWAY
+  datasource:
+    url: jdbc:mysql://${DATABASE_HOSTNAME}:${DATABASE_PORT}/${DATABASE_NAME}
+    username: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    # TypeORM chạy synchronize:true nên schema do entity sinh ra; update giữ nguyên cách đó.
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: false
+        default_batch_fetch_size: 32
+    hibernate:
+      ddl-auto: update
+      naming:
+        # BẮT BUỘC. Mặc định của Spring Boot (CamelCaseToUnderscoresNamingStrategy) đổi cả tên cột
+        # đã khai tường minh: `createdAt` -> `created_at`, `receptorId` -> `receptor_id`. Schema do
+        # TypeORM sinh ra giữ nguyên camelCase, nên để mặc định là tạo ra một bộ cột song song và
+        # khoá ngoại trỏ vào cột không tồn tại.
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+    # Tắt open-in-view: mọi ánh xạ entity -> DTO phải nằm trong service, còn transaction.
+    open-in-view: false
+
+
+  data:
+    redis:
+      host: ${REDIS_HOSTNAME}
+      port: ${REDIS_PORT}
+
+  mail:
+    host: ${MAIL_HOST}
+    port: ${MAIL_PORT}
+    username: ${MAIL_USER}
+    password: ${MAIL_PASS}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+  servlet:
+    multipart:
+      max-file-size: ${MAX_FILE_SIZE}
+      max-request-size: ${MAX_REQUEST_SIZE}
+
+lopet:
+  jwt:
+    access-token-secret: ${ACCESS_TOKEN_SECRET}
+    refresh-token-secret: ${REFRESH_TOKEN_SECRET}
+    access-token-expires-in: ${ACCESS_TOKEN_EXPIRES_IN}
+    refresh-token-expires-in: ${REFRESH_TOKEN_EXPIRES_IN}
+
+  cors:
+    # corsMiddleware của TS mở '*' bất kể DOMAIN_CORS, giữ nguyên mặc định đó.
+    allowed-origins: ${DOMAIN_CORS}
+
+  cloudinary:
+    cloud-name: ${CLOUDINARY_CLOUD_NAME}
+    api-key: ${CLOUDINARY_API_KEY}
+    api-secret: ${CLOUDINARY_API_SECRET}
+
+  mail:
+    admin-receiver: ${MAIL_ADMIN_RECEIVER}
+
+  admin:
+    email: ${INIT_ADMIN_EMAIL}
+    username: ${INIT_ADMIN_USERNAME}
+    password: ${INIT_ADMIN_PASSWORD}
+
+  socket:
+    # netty-socketio phải nghe cổng riêng vì Tomcat đã chiếm ${APP_PORT}.
+    # Xem docs/MIGRATION_FINAL_REPORT.md — đây là khác biệt cần client đổi URL socket.
+    hostname: ${SOCKET_HOSTNAME}
+    port: ${SOCKET_PORT}
+
+logging:
+  level:
+    root: ${LOG_LEVEL}
+    com.nguyenvu.lopet: ${LOG_LEVEL}
