@@ -1,10 +1,11 @@
 # Mẫu cấu hình nginx — KHÔNG phải file nginx đọc trực tiếp.
 #
-# docker/entrypoint.sh chạy `envsubst '${PORT}'` trên file này rồi ghi kết quả ra
-# /app/runtime/nginx.conf. Danh sách biến truyền cho envsubst là BẮT BUỘC: gọi envsubst
-# không tham số thì nó thay MỌI thứ trông giống $tên — $http_upgrade, $host, $remote_addr,
-# $proxy_add_x_forwarded_for của chính nginx đều thành chuỗi rỗng, và cấu hình sinh ra tuy
-# vẫn parse được nhưng mất sạch header proxy. Chỉ ${PORT} được phép thay.
+# docker/entrypoint.sh chạy `envsubst '${PORT} ${REST_PORT} ${SOCK_PORT}'` trên file này rồi
+# ghi kết quả ra /app/runtime/nginx.conf. Danh sách biến truyền cho envsubst là BẮT BUỘC: gọi
+# envsubst không tham số thì nó thay MỌI thứ trông giống $tên — $http_upgrade, $host,
+# $remote_addr, $proxy_add_x_forwarded_for của chính nginx đều thành chuỗi rỗng, và cấu hình
+# sinh ra tuy vẫn parse được nhưng mất sạch header proxy. Đúng ba biến trên được phép thay,
+# và cả ba đều do entrypoint tự đặt — không lấy từ Render Environment.
 #
 # Vì sao cần lớp nginx này: Render chỉ mở đúng MỘT cổng công khai ($PORT do Render cấp lúc
 # chạy), trong khi JVM này mở hai — Tomcat cho REST và netty-socketio cho realtime. Không có
@@ -52,12 +53,12 @@ http {
     }
 
     upstream lopet_rest {
-        server 127.0.0.1:8080;
+        server 127.0.0.1:${REST_PORT};
         keepalive 32;
     }
 
     upstream lopet_socket {
-        server 127.0.0.1:8081;
+        server 127.0.0.1:${SOCK_PORT};
         keepalive 32;
     }
 

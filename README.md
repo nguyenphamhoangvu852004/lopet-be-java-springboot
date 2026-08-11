@@ -155,8 +155,17 @@ Render ──$PORT──▶ nginx ──┬── /socket.io/ ──▶ 127.0.0.
 
 | File | Vai trò |
 |---|---|
-| [`docker/nginx.conf.template`](docker/nginx.conf.template) | cấu hình proxy; `${PORT}` được `envsubst` bơm vào lúc container khởi động |
-| [`docker/entrypoint.sh`](docker/entrypoint.sh) | sinh cấu hình → bật nginx → `exec java` (JVM giữ PID 1 để nhận SIGTERM) |
+| [`docker/nginx.conf.template`](docker/nginx.conf.template) | cấu hình proxy; `${PORT}` và hai cổng upstream được `envsubst` bơm vào lúc container khởi động |
+| [`docker/entrypoint.sh`](docker/entrypoint.sh) | sinh cấu hình → **chờ 8080/8081 mở** → bật nginx → `exec java` (JVM giữ PID 1 để nhận SIGTERM) |
+
+Chi tiết dễ bỏ sót: nginx chỉ mở cổng công khai **sau khi** Tomcat và Socket.IO đã nghe. Spring
+mất ~30s để lên; bật nginx ngay từ giây đầu thì `$PORT` mở trong khi phía sau chưa có ai, Render
+tưởng deploy xong và cho traffic vào, health check đập trúng 502 và deploy bị đánh trượt. Chờ
+xong mới mở giữ đúng ngữ nghĩa của bản chưa có proxy: **cổng mở nghĩa là app sẵn sàng**.
+
+Kèm theo: 502 do nginx sinh ra không có header CORS, nên trình duyệt hiển thị nó thành
+`No 'Access-Control-Allow-Origin' header is present` — một thông báo trỏ sai hoàn toàn hướng.
+Gặp lỗi CORS lạ thì kiểm tra bằng `curl -i` trước, xem mã trả về thật là gì.
 
 Frontend dùng đúng một origin cho cả hai:
 
@@ -179,8 +188,9 @@ docker build -t lopet-be .
 docker run --rm -p 3000:3000 -e PORT=3000 --env-file .env lopet-be
 ```
 
-`PORT` phải trùng cổng bên trong của `-p` và không được là 8080/8081 (entrypoint chặn thẳng, vì
-trùng với cổng nội bộ). Kiểm tra cả hai đường:
+`PORT` phải trùng cổng bên trong của `-p`. Đặt `PORT=8080` hay `8081` vẫn chạy được: entrypoint
+thấy trùng cổng nội bộ thì dời upstream sang 18080/18081, vì thứ bắt buộc phải nghe đúng `$PORT`
+chỉ có nginx. Kiểm tra cả hai đường:
 
 ```bash
 curl -i http://localhost:3000/api/v1/roles                  # REST qua nginx
