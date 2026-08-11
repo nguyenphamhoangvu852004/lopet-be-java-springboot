@@ -17,12 +17,6 @@ spring:
       host: localhost
       port: 6379
 
-  mail:
-    host: localhost
-    port: 3025
-    username: test@lopet.local
-    password: test
-
   servlet:
     multipart:
       max-file-size: 100MB
@@ -44,7 +38,12 @@ lopet:
     api-secret: test-secret
 
   mail:
+    from: Lopet Test <test@lopet.local>
     admin-receiver: admin@lopet.local
+    resend:
+      # Khoá giả: test không được gọi ra Resend thật. Bean Resend chỉ giữ chuỗi này, không gọi mạng
+      # lúc tạo, nên context vẫn lên bình thường.
+      api-key: re_test_fake_key
 
   # Để trống ba biến này là có chủ đích: AdminInitializer bỏ qua khi cấu hình rỗng, nên test không
   # tạo tài khoản admin trong database test.

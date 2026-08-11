@@ -63,12 +63,14 @@ REDIS_HOSTNAME=127.0.0.1 REDIS_PORT=6379 \
 APP_PORT=8080 SOCKET_PORT=8081 \
 ACCESS_TOKEN_SECRET=... REFRESH_TOKEN_SECRET=... \
 CLOUDINARY_CLOUD_NAME=... CLOUDINARY_API_KEY=... CLOUDINARY_API_SECRET=... \
-MAIL_HOST=smtp.gmail.com MAIL_PORT=587 MAIL_USER=... MAIL_PASS=... \
+RESEND_API_KEY=re_... MAIL_FROM='Lopet <no-reply@domain-da-verify>' \
 INIT_ADMIN_EMAIL=... INIT_ADMIN_USERNAME=... INIT_ADMIN_PASSWORD=... \
 java -jar target/lopet-0.0.1-SNAPSHOT.jar
 ```
 
-Biến mới duy nhất: **`SOCKET_PORT`**.
+Biến mới: **`SOCKET_PORT`**, **`RESEND_API_KEY`**, **`MAIL_FROM`**. Ba biến SMTP cũ
+(`MAIL_HOST`/`MAIL_PORT`/`MAIL_USER`/`MAIL_PASS`) không còn được đọc — mail đi qua HTTP API của
+[Resend](https://resend.com) vì Render chặn cổng SMTP ra ngoài.
 
 Chạy ở chế độ dev:
 

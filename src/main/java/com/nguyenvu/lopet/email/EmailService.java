@@ -1,24 +1,22 @@
 package com.nguyenvu.lopet.email;
 
-import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
 import com.nguyenvu.lopet.common.exception.BadRequestException;
 
-import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class EmailService {
 
     private static final SecureRandom RANDOM = new SecureRandom();
 
-    private final JavaMailSender mailSender;
+    private final ResendMailSender mailSender;
     private final OtpStore otpStore;
 
     /**
@@ -53,15 +51,16 @@ public class EmailService {
         return String.valueOf(100_000 + RANDOM.nextInt(900_000));
     }
 
+    /**
+     * Giữ nguyên message "Send email failed" của bản TS để client không phải đổi, nhưng log nguyên
+     * nhân thật: lỗi hay gặp của Resend (401 sai khoá, 403 domain chưa verify) chỉ nằm trong message
+     * của exception, nuốt đi là mất luôn manh mối duy nhất.
+     */
     private void send(String email, String otp) {
         try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, false, StandardCharsets.UTF_8.name());
-            helper.setTo(email);
-            helper.setSubject("Mã xác thực OTP của bạn");
-            helper.setText(body(otp), true);
-            mailSender.send(message);
+            mailSender.sendHtml(email, "Mã xác thực OTP của bạn", body(otp));
         } catch (Exception exception) {
+            log.error("Gửi mail OTP tới {} thất bại: {}", email, exception.getMessage());
             throw new BadRequestException("Send email failed");
         }
     }

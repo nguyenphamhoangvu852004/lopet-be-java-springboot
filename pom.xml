@@ -18,6 +18,7 @@
 		<java.version>21</java.version>
 		<netty-socketio.version>2.0.13</netty-socketio.version>
 		<cloudinary.version>2.3.0</cloudinary.version>
+		<resend.version>4.4.0</resend.version>
 	</properties>
 
 	<dependencies>
@@ -41,10 +42,18 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-redis</artifactId>
 		</dependency>
+		<!--
+			Mail đi qua HTTP API của Resend thay cho spring-boot-starter-mail/SMTP: các nền tảng
+			hosting (Railway, Render...) chặn cổng 587/465 ra ngoài, nên SMTP không dùng được ở
+			production. SDK kéo theo okhttp + jackson 2 ở scope runtime, dùng ObjectMapper riêng
+			nên không đụng tới cấu hình Jackson của app (xem config/JacksonConfig).
+		-->
 		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-mail</artifactId>
+			<groupId>com.resend</groupId>
+			<artifactId>resend-java</artifactId>
+			<version>${resend.version}</version>
 		</dependency>
+
 		<!-- Boot 4 đổi tên spring-boot-starter-aop thành spring-boot-starter-aspectj -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
