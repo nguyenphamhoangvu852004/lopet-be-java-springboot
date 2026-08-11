@@ -12,11 +12,16 @@ target/
 
 .idea/
 .vscode/
+.claude/
 *.iml
 *.iws
 *.ipr
 
+# Dockerfile gọi `mvn` của ảnh maven, không dùng wrapper.
+mvnw
+mvnw.cmd
+.mvn/
+
 docs/
 scripts/
-README.md
-HELP.md
+*.md
