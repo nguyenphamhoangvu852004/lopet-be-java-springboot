@@ -41,6 +41,7 @@ spring:
 
   data:
     redis:
+      url: ${REDIS_URL}
       host: ${REDIS_HOSTNAME}
       port: ${REDIS_PORT}
       password: ${REDIS_PASSWORD}
