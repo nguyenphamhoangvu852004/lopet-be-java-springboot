@@ -28,7 +28,7 @@ spring:
         format_sql: false
         default_batch_fetch_size: 32
     hibernate:
-      ddl-auto: update
+      ddl-auto: none
       naming:
         # BẮT BUỘC. Mặc định của Spring Boot (CamelCaseToUnderscoresNamingStrategy) đổi cả tên cột
         # đã khai tường minh: `createdAt` -> `created_at`, `receptorId` -> `receptor_id`. Schema do
