@@ -1,14 +1,12 @@
 package com.nguyenvu.lopet.config;
 
+import com.nguyenvu.lopet.security.AuthInterceptor;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
-
-import com.nguyenvu.lopet.security.AuthInterceptor;
-
-import lombok.RequiredArgsConstructor;
 
 @Configuration
 @RequiredArgsConstructor
@@ -33,12 +31,14 @@ public class WebConfig implements WebMvcConfigurer {
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
                 .allowedOriginPatterns(allowedOrigins)
-                .allowedMethods("GET", "POST", "PUT", "DELETE", "PATCH")
-                .allowedHeaders(
-                        "Content-Type",
-                        "Authorization",
-                        "Access-Control-Allow-Origin",
-                        "Access-Control-Allow-Headers",
-                        "Access-Control-Allow-Methods");
+                .allowedMethods(
+                        "GET",
+                        "POST",
+                        "PUT",
+                        "DELETE",
+                        "PATCH",
+                        "OPTIONS"
+                )
+                .allowedHeaders("*");
     }
 }
