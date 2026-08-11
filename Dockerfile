@@ -33,6 +33,7 @@ FROM eclipse-temurin:21-jdk AS jre-build
 RUN "$JAVA_HOME/bin/jlink" \
       --add-modules \
 java.base,\
+java.compiler,\
 java.desktop,\
 java.instrument,\
 java.logging,\
