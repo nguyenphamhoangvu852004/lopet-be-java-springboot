@@ -1,2 +1,6 @@
 /mvnw text eol=lf
 *.cmd text eol=crlf
+
+# Script chạy trong container Linux: một ký tự CR lọt vào là `sh` báo "not found" ở dòng đầu.
+*.sh text eol=lf
+docker/nginx.conf.template text eol=lf

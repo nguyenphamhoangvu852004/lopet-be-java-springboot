@@ -1,6 +1,8 @@
 # Tên biến môi trường giữ trùng với example.env của lopet-be để file .env đang chạy dùng lại được.
 server:
-  port: ${APP_PORT}
+  # Trong container, entrypoint truyền --server.port=8080 nên nhánh mặc định này chỉ dùng cho
+  # lần chạy trực tiếp trên máy dev không có APP_PORT.
+  port: ${APP_PORT:8080}
 
 spring:
   # Nạp .env ở thư mục chạy app theo định dạng properties. `optional:` để app vẫn khởi động được
@@ -73,7 +75,6 @@ lopet:
     from: ${MAIL_FROM}
     admin-receiver: ${MAIL_ADMIN_RECEIVER}
     resend:
-
       api-key: ${RESEND_API_KEY}
 
   admin:
@@ -84,8 +85,12 @@ lopet:
   socket:
     # netty-socketio phải nghe cổng riêng vì Tomcat đã chiếm ${APP_PORT}.
     # Xem docs/MIGRATION_FINAL_REPORT.md — đây là khác biệt cần client đổi URL socket.
-    hostname: ${SOCKET_HOSTNAME}
-    port: ${SOCKET_PORT}
+    #
+    # Khi chạy bằng Docker thì không còn khác biệt đó: docker/entrypoint.sh truyền thẳng
+    # --lopet.socket.hostname/--lopet.socket.port, và nginx gộp cả hai cổng về một origin
+    # duy nhất, client dùng lại đúng URL của REST API.
+    hostname: ${SOCKET_HOSTNAME:0.0.0.0}
+    port: ${SOCKET_PORT:8081}
 
 logging:
   level:

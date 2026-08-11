@@ -84,6 +84,14 @@ jdk.zipfs \
 # thiết. Chứng chỉ TLS đi theo cacerts trong chính runtime jlink dựng ra, không cần cài thêm.
 FROM debian:trixie-slim AS runtime
 
+# nginx-light: bản rút gọn của Debian, đã có sẵn ngx_http_proxy_module và ngx_http_map_module
+# (cả hai đều là module lõi, luôn được biên dịch vào) — đủ cho một reverse proxy thuần.
+# gettext-base: chỉ để lấy `envsubst`, thứ bơm $PORT của Render vào nginx.conf lúc container
+# khởi động. nginx không tự đọc biến môi trường trong file cấu hình.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends nginx-light gettext-base \
+ && rm -rf /var/lib/apt/lists/*
+
 ENV JAVA_HOME=/opt/java
 ENV PATH="$JAVA_HOME/bin:$PATH"
 
@@ -110,13 +118,22 @@ COPY --from=build /build/extracted/spring-boot-loader/ ./
 COPY --from=build /build/extracted/snapshot-dependencies/ ./
 COPY --from=build /build/extracted/application/ ./
 
+# Hạ tầng proxy. Hai file này thay đổi độc lập với code nên để sau cùng cũng không hại cache.
+COPY docker/nginx.conf.template /app/nginx.conf.template
+COPY docker/entrypoint.sh /app/entrypoint.sh
+
+# nginx của gói Debian mặc định ghi pid vào /run và file tạm vào /var/lib/nginx — cả hai đều
+# ngoài tầm với của user lopet. Dồn hết vào /app/runtime, thư mục duy nhất mà process được ghi.
+# Bit thực thi đặt ở đây chứ không trông vào quyền của file trên máy build: repo này clone trên
+# Windows, nơi NTFS không giữ chmod nào cả.
+RUN mkdir -p /app/runtime \
+ && chown lopet:lopet /app/runtime \
+ && chmod +x /app/entrypoint.sh
+
 USER lopet
 
-# Chỉ để ghi tài liệu; Render định tuyến theo $PORT chứ không đọc EXPOSE.
-EXPOSE 8080
+# Chỉ để ghi tài liệu; Render định tuyến theo $PORT chứ không đọc EXPOSE. Cổng thật do nginx
+# mở, lấy từ $PORT lúc chạy; 8080/8081 chỉ sống bên trong container.
+EXPOSE 10000
 
-# Render cấp cổng qua $PORT và bắt app phải nghe đúng cổng đó. Truyền bằng tham số dòng lệnh vì
-# nó có precedence cao nhất, ghi đè hẳn `server.port: ${APP_PORT}` trong application.yml — nhờ vậy
-# không cần khai thêm biến APP_PORT trên Render.
-# Chạy thẳng JarLauncher trên cây thư mục đã bung, không còn `-jar app.jar` nữa.
-ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS org.springframework.boot.loader.launch.JarLauncher --server.port=${PORT:-8080}"]
+ENTRYPOINT ["/app/entrypoint.sh"]
