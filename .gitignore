@@ -32,7 +32,6 @@ build/
 ### VS Code ###
 .vscode/
 
-.env
-*.env
-**/application.yml
+.env*
+!.env.example
 

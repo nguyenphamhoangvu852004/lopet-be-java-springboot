@@ -1,0 +1,22 @@
+# .env TUYỆT ĐỐI không được vào image: secret phải đến từ Environment của Render lúc chạy.
+# application.yml khai `optional:file:.env[.properties]` nên thiếu file này app vẫn khởi động bình
+# thường, miễn là các biến đã có trong môi trường.
+.env
+.env.*
+*.env
+
+target/
+.git/
+.gitignore
+.gitattributes
+
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+
+docs/
+scripts/
+README.md
+HELP.md
