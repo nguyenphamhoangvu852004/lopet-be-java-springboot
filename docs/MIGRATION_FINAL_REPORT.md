@@ -144,9 +144,12 @@ Hai bộ integration chạy trên MySQL thật với database riêng cho từng 
   vào cùng listener; netty-socketio là một server Netty độc lập.
 * **Giải pháp**: Socket.IO nghe `SOCKET_PORT` (mặc định 8081), cùng protocol EIO4 nên
   `socket.io-client` v4 của frontend giữ nguyên.
-* **Ảnh hưởng**: client phải trỏ URL socket sang cổng mới — sửa đúng một dòng
-  (`io("http://host:8081", { auth: { token } })`). Muốn giữ nguyên một cổng thì đặt reverse proxy
-  (nginx) định tuyến `/socket.io/` về 8081.
+* **Ảnh hưởng**: chạy trực tiếp bằng `java -jar` thì client phải trỏ URL socket sang cổng mới —
+  sửa đúng một dòng (`io("http://host:8081", { auth: { token } })`).
+* **Đã khép lại ở bản Docker**: image có sẵn nginx (`docker/nginx.conf.template`) định tuyến
+  `/socket.io/` về 127.0.0.1:8081 và phần còn lại về 127.0.0.1:8080, mở đúng một cổng công khai
+  là `$PORT` của Render. Deploy bằng image này thì frontend dùng chung một origin cho cả REST lẫn
+  socket, tức là khác biệt 4.1 không còn nhìn thấy được từ phía client. Chi tiết ở README §Deploy.
 
 ### 4.2. Xác thực socket nằm ở `AuthTokenListener`, không phải `AuthorizationListener`
 

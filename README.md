@@ -128,7 +128,8 @@ Bốn tầng phân quyền độc lập, đúng như bản Express:
 ## Khác biệt duy nhất với bản cũ
 
 Express gắn Socket.IO vào chính HTTP server nên dùng chung cổng 8080. Ở Java, Tomcat sở hữu cổng
-HTTP nên Socket.IO phải nghe cổng riêng (`SOCKET_PORT`, mặc định 8081). Client sửa một dòng:
+HTTP nên Socket.IO phải nghe cổng riêng (`SOCKET_PORT`, mặc định 8081). Chạy trực tiếp bằng
+`java -jar`, client sửa một dòng:
 
 ```js
 // trước
@@ -137,7 +138,57 @@ const socket = io("http://localhost:8080", { auth: { token } })
 const socket = io("http://localhost:8081", { auth: { token } })
 ```
 
-Muốn giữ nguyên một cổng thì đặt nginx định tuyến `/socket.io/` về 8081.
+**Chạy bằng Docker thì khác biệt này biến mất**: image có sẵn nginx gộp hai cổng về một origin,
+`/socket.io/` và REST API dùng chung URL đúng như bản Express — xem [Deploy](#deploy-render).
+
+## Deploy (Render)
+
+Render chỉ mở **một** cổng công khai cho mỗi service, lấy từ biến `$PORT` do nó tự cấp lúc chạy.
+JVM này lại mở hai — Tomcat và netty-socketio — nên nếu để trần, Render chỉ định tuyến tới một
+trong hai và `wss://.../socket.io/` không bao giờ bắt tay được. Image giải quyết bằng một lớp
+nginx đứng trước:
+
+```
+Render ──$PORT──▶ nginx ──┬── /socket.io/ ──▶ 127.0.0.1:8081  netty-socketio
+                          └── /           ──▶ 127.0.0.1:8080  Tomcat (REST)
+```
+
+| File | Vai trò |
+|---|---|
+| [`docker/nginx.conf.template`](docker/nginx.conf.template) | cấu hình proxy; `${PORT}` được `envsubst` bơm vào lúc container khởi động |
+| [`docker/entrypoint.sh`](docker/entrypoint.sh) | sinh cấu hình → bật nginx → `exec java` (JVM giữ PID 1 để nhận SIGTERM) |
+
+Frontend dùng đúng một origin cho cả hai:
+
+```js
+const socket = io("https://<service>.onrender.com", { auth: { token } })
+```
+
+### ⚠️ Biến môi trường cần **xoá** khỏi Render Environment
+
+`APP_PORT`, `SOCKET_PORT`, `SOCKET_HOSTNAME` — nếu còn sót lại từ lần deploy trước thì xoá đi.
+Hai cổng nội bộ 8080/8081 giờ cố định trong `docker/entrypoint.sh` và truyền bằng tham số dòng
+lệnh (`--server.port`, `--lopet.socket.port`), thứ có precedence cao nhất trong Spring — các biến
+đó có tồn tại cũng không còn tác dụng, chỉ gây hiểu nhầm là còn chỉnh được. Cổng duy nhất còn ý
+nghĩa là `$PORT`, và **Render tự cấp**, đừng tự khai.
+
+### Build và test tại máy
+
+```bash
+docker build -t lopet-be .
+docker run --rm -p 3000:3000 -e PORT=3000 --env-file .env lopet-be
+```
+
+`PORT` phải trùng cổng bên trong của `-p` và không được là 8080/8081 (entrypoint chặn thẳng, vì
+trùng với cổng nội bộ). Kiểm tra cả hai đường:
+
+```bash
+curl -i http://localhost:3000/api/v1/roles                  # REST qua nginx
+curl -i "http://localhost:3000/socket.io/?EIO=4&transport=polling"   # handshake Socket.IO
+```
+
+Handshake trả `0{"sid":"...","upgrades":["websocket"],...}` là nginx đã định tuyến đúng sang
+netty-socketio.
 
 Các khác biệt còn lại (thông điệp lỗi handshake socket, số phần tử trong mảng `errors` của
 validation, ranh giới transaction) đều được liệt kê ở
