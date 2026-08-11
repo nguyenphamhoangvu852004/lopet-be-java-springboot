@@ -72,7 +72,7 @@ jdk.zipfs \
 #   java.desktop      java.beans.Introspector — Spring dùng để nội suy property của bean.
 #   jdk.unsupported   sun.misc.Unsafe — netty (netty-socketio) không chạy nếu thiếu.
 #   jdk.zipfs         Spring Boot loader đọc jar lồng nhau qua ZipFileSystem.
-#   jdk.crypto.ec     cipher suite ECDHE, tức là mọi kết nối HTTPS/TLS ra ngoài (SMTP, Cloudinary).
+#   jdk.crypto.ec     cipher suite ECDHE, tức là mọi kết nối HTTPS/TLS ra ngoài (Resend, Cloudinary).
 #   java.security.sasl mysql-connector-j và lettuce xác thực qua SASL.
 #   jdk.naming.dns    netty resolver phân giải tên miền.
 #   --strip-debug     chỉ bỏ debug info của class trong JDK; class của app nằm ngoài jlink nên

@@ -17,7 +17,7 @@ trong được phép khác; API contract và business behavior thì không.
 | Validation | Joi | Bean Validation (Jakarta) + validator tuỳ biến |
 | Realtime | socket.io 4.8 | **netty-socketio** (cùng protocol EIO4 → client socket.io-client không đổi) |
 | Upload | multer + Cloudinary SDK | `MultipartFile` + Cloudinary Java SDK |
-| Mail | nodemailer | `spring-boot-starter-mail` |
+| Mail | nodemailer (SMTP) | **Resend HTTP API** (`com.resend:resend-java`) — SMTP bị hosting chặn cổng |
 | Log | winston + daily-rotate | Logback + `RollingFileAppender` |
 | Test | Jest + supertest | JUnit 5 + MockMvc + Testcontainers/MySQL thật |
 

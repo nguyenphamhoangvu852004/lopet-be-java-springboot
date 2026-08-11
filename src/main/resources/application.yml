@@ -46,21 +46,6 @@ spring:
       port: ${REDIS_PORT}
       password: ${REDIS_PASSWORD}
 
-  mail:
-    host: ${MAIL_HOST}
-    port: ${MAIL_PORT}
-    username: ${MAIL_USER}
-    password: ${MAIL_PASS}
-    properties:
-      mail:
-        smtp:
-          auth: true
-          starttls:
-            enable: true
-          connectiontimeout: 10000
-          timeout: 10000
-          writetimeout: 10000
-
   servlet:
     multipart:
       max-file-size: ${MAX_FILE_SIZE}
@@ -82,8 +67,13 @@ lopet:
     api-key: ${CLOUDINARY_API_KEY}
     api-secret: ${CLOUDINARY_API_SECRET}
 
+  # Mail đi qua HTTP API của Resend, không còn SMTP nên không còn khối `spring.mail`.
   mail:
+    # Phải thuộc domain đã verify trong dashboard Resend. Dạng "Tên hiển thị <địa-chỉ@domain>".
+    from: ${MAIL_FROM}
     admin-receiver: ${MAIL_ADMIN_RECEIVER}
+    resend:
+      api-key: ${RESEND_API_KEY}
 
   admin:
     email: ${INIT_ADMIN_EMAIL}
