@@ -73,6 +73,7 @@ lopet:
     from: ${MAIL_FROM}
     admin-receiver: ${MAIL_ADMIN_RECEIVER}
     resend:
+
       api-key: ${RESEND_API_KEY}
 
   admin:
