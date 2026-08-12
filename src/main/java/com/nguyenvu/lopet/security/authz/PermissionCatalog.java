@@ -36,6 +36,12 @@ public final class PermissionCatalog {
             PermissionDef.of("group:delete:own", "Xoá nhóm mình làm chủ"),
             PermissionDef.of("report:create", "Gửi báo cáo"),
             PermissionDef.of("profile:update:own", "Sửa hồ sơ của chính mình"),
+            // Ba quyền pet chỉ là tầng 1. Tầng 2 là sở hữu, tra trong `pet_ownerships` chứ không phải
+            // cột chủ sở hữu trên `pets` — xem PetAccessGuard. Cố ý KHÔNG có mã `pet:delete` cho staff:
+            // chưa có luồng kiểm duyệt nào cần xoá thú cưng của người khác.
+            PermissionDef.of("pet:create", "Tạo hồ sơ thú cưng"),
+            PermissionDef.of("pet:update:own", "Sửa hồ sơ thú cưng mình sở hữu"),
+            PermissionDef.of("pet:delete:own", "Lưu trữ hồ sơ thú cưng mình sở hữu"),
             PermissionDef.of("friendship:manage:own", "Quản lý kết bạn của chính mình"),
             // Ba quyền ads dưới đây mới chỉ là điều kiện cần. Điều kiện đủ là tài khoản phải có
             // advertiser_profile ở trạng thái APPROVED — tầng capability kiểm.

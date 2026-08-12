@@ -520,6 +520,11 @@ Ký hiệu: `req` = `@Auth` (mặc định `required=true`) · `opt` = `@Auth(re
 | `/v1/posts/{postId}` (multipart/json) | PUT | req | `post:update:own` | `PostAccessGuard.requireOwnerToEdit` (**NO_BYPASS**) + kiểm lại trong `PostService.update` | `:107`, `:123` |
 | `/v1/posts/{id}` | DELETE | req | `post:delete:own` **hoặc** `post:delete` | `PostAccessGuard.requireOwnerToDelete` (bypass ADMIN) | `:135` |
 | `/v1/posts/like`, `/v1/posts/unlike` | POST | req | — | — | `:143`, `:150` |
+| `/v1/pets` | POST | req | `pet:create` | người tạo thành PRIMARY_OWNER, id lấy từ token | `PetController.java:46` |
+| `/v1/pets/me` | GET | req | — | ownerId lấy từ token, **không** nhận query param | `:62` |
+| `/v1/pets/{petId}` | GET | opt | — | `PetVisibilityFilter` | `:72` |
+| `/v1/pets/{petId}` | PUT | req | `pet:update:own` | `PetAccessGuard.requireOwnerToEdit` (**NO_BYPASS**) + kiểm lại trong `PetService.update` | `:78` |
+| `/v1/pets/{petId}` | DELETE | req | `pet:delete:own` | `PetAccessGuard.requireOwnerToArchive` (**NO_BYPASS**) + `PetService.archive` đòi đúng PRIMARY_OWNER | `:89` |
 | `/v1/comments` (multipart/json) | POST | req | `comment:create` | `postRepository.findVisibleById` trong service | `CommentController.java:35`, `:48` |
 | `/v1/comments/{postId}` | GET | opt | — | `PostVisibility` | `:68` |
 | `/v1/comments/{commentId}` | DELETE | req | `comment:delete:own` **hoặc** `post:delete` | `CommentAccessGuard` (bypass ADMIN) | `:75` |
@@ -587,7 +592,8 @@ ROLE_PERMISSIONS = Map.of(
 ```
 
 `resolvePermissions(List<String> roles)` (`:72-91`):
-1. Luôn nạp **toàn bộ 15 `BASELINE_PERMISSIONS`** (`:28-45`) cho mọi người gọi đã xác thực.
+1. Luôn nạp **toàn bộ 18 `BASELINE_PERMISSIONS`** (`:28-48`) cho mọi người gọi đã xác thực
+   (15 mã gốc + `pet:create`, `pet:update:own`, `pet:delete:own`).
 2. Với mỗi chuỗi role trong token: `RoleName.valueOf(role)`; **role lạ bị bỏ qua trong im lặng**
    (`:83-86`, có test `PermissionCatalogTest.role_la_khong_lam_mat_quyen_baseline`).
 3. Cộng thêm permission của role đó.
