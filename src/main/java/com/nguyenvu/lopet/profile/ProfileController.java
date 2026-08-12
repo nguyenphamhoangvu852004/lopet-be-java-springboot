@@ -55,7 +55,7 @@ public class ProfileController {
     /* ---------- Ghi: bắt buộc xác thực ---------- */
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @Auth
+    @Auth()
     @RequirePermission("profile:update:own")
     public ApiResponse<ProfileDtos.ProfileSummary> create(
             @RequestParam(required = false) String fullName,
