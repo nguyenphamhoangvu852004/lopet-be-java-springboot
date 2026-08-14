@@ -21,6 +21,7 @@ import com.nguyenvu.lopet.common.exception.ConflictException;
 import com.nguyenvu.lopet.common.exception.ForbiddenException;
 import com.nguyenvu.lopet.common.exception.NotFoundException;
 import com.nguyenvu.lopet.email.OtpStore;
+import com.nguyenvu.lopet.profile.ProfileFactory;
 import com.nguyenvu.lopet.security.jwt.JwtService;
 import com.nguyenvu.lopet.security.jwt.UserPrincipal;
 
@@ -81,11 +82,15 @@ public class AuthService {
             throw new BadRequestException();
         }
 
+        // Hồ sơ được cấp ngay tại đây thay vì để người dùng tự tạo bằng request riêng. Quan hệ
+        // Account.profile khai cascade PERSIST nên JPA insert `profiles` rồi set `accounts.profileId`
+        // trong cùng transaction — đăng ký hỏng thì không để lại hồ sơ mồ côi.
         Account saved = accountRepository.save(Account.builder()
                 .email(request.email())
                 .username(request.username())
                 .password(passwordEncoder.encode(request.password()))
                 .isBanned(0)
+                .profile(ProfileFactory.seedFor(request.username()))
                 .build());
 
         return new RegisterResponse(saved.getId(), saved.getEmail(), saved.getUsername());

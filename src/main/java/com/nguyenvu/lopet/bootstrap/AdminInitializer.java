@@ -11,6 +11,7 @@ import com.nguyenvu.lopet.account.AccountService;
 import com.nguyenvu.lopet.account.entity.Account;
 import com.nguyenvu.lopet.account.repository.AccountRepository;
 import com.nguyenvu.lopet.common.exception.BadRequestException;
+import com.nguyenvu.lopet.profile.ProfileFactory;
 import com.nguyenvu.lopet.role.entity.RoleName;
 
 import lombok.RequiredArgsConstructor;
@@ -47,12 +48,15 @@ public class AdminInitializer {
             return;
         }
 
+        // Đường tạo tài khoản THỨ HAI, không đi qua AuthService.register. Thiếu profile ở đây thì
+        // tài khoản admin rơi đúng vào trạng thái "account không có hồ sơ" mà refactor vừa xoá bỏ.
         if (!accountRepository.existsByEmail(email)) {
             accountRepository.save(Account.builder()
                     .email(email)
                     .username(username)
                     .password(passwordEncoder.encode(password))
                     .isBanned(0)
+                    .profile(ProfileFactory.seedFor(username))
                     .build());
             log.info("Đã tạo tài khoản admin khởi tạo: {}", email);
         }

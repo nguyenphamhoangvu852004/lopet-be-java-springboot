@@ -109,7 +109,7 @@ background job, cache tầng đọc (Redis chỉ dùng cho OTP).
 | PUT `/posts/:postId` | `[]` | kiểm duyệt thì xoá, không viết hộ |
 | DELETE `/posts/:id` | `[ADMIN]` | staff xoá bài vi phạm |
 | DELETE `/comments/:commentId` | `[ADMIN]` | như trên |
-| PATCH `/profiles/:id` | `[]` | hồ sơ là dữ liệu riêng |
+| ~~PATCH `/profiles/:id`~~ | — | Endpoint đã bỏ. `PUT /v1/profiles` tra hồ sơ bằng accountId trong token nên không còn tầng ownership để bypass |
 | GET/PATCH `/messages/*` | `[]` | nội dung riêng tư |
 | GET `/friendships/:id` | (không dùng requireOwnership) | ADMIN cũng không xem |
 | PUT/DELETE `/advertisements/*` | `[ADMIN]` | |

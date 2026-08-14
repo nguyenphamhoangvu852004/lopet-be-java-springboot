@@ -211,8 +211,10 @@ Ghi ra để chủ dự án quyết định, **chưa** thay đổi vì đó là 
 
 1. `GET /v1/notifications/:id` và `PUT /v1/notifications/:id` không kiểm người gọi có phải
    `receptor` — bất kỳ ai đăng nhập cũng đọc và đổi trạng thái thông báo của người khác.
-2. `PATCH /v1/profiles/:id` **xoá** `avatarUrl`/`coverUrl` khi request không kèm file mới, vì
-   controller cũ luôn truyền chuỗi rỗng và `??` không bắt chuỗi rỗng.
+2. ~~`PATCH /v1/profiles/:id` **xoá** `avatarUrl`/`coverUrl` khi request không kèm file mới, vì
+   controller cũ luôn truyền chuỗi rỗng và `??` không bắt chuỗi rỗng.~~
+   **ĐÃ SỬA** trong refactor module Profile: endpoint thay bằng `PUT /v1/profiles`, và controller
+   truyền `null` (không phải chuỗi rỗng) khi không có file — ảnh cũ được giữ nguyên.
 3. `POST /v1/friendships` chỉ chặn trùng đúng chiều gửi→nhận; hai bản ghi ngược chiều cùng tồn tại được.
 4. `POST /v1/reports` không kiểm target có tồn tại.
 5. `GET /v1/groups/:id` công khai, kể cả nhóm PRIVATE (chỉ bài viết trong nhóm mới được bảo vệ).

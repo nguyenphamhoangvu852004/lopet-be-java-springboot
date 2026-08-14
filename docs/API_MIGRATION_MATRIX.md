@@ -72,9 +72,18 @@ OTP 6 chữ số, Redis key `otp:<email>` TTL **120s**. Verify xoá `otp:` và �
 | 14 | GET | `/v1/profiles` | - | - | query `?fullName=` (ILIKE `%...%`), `?id=` | DONE |
 | 15 | GET | `/v1/profiles/:id` | - | - | trả **entity Profiles** (kèm `account`) | DONE |
 | 16 | GET | `/v1/profiles/accounts/:id` | - | - | theo accountId, trả `GetProfileOutputDTO` | DONE |
-| 17 | POST | `/v1/profiles` | req | `perm:profile:update:own` | multipart `avatar[1]`, `cover[1]` → Cloudinary; **tạo profile rời, chưa gắn account** | DONE |
-| 18 | POST | `/v1/profiles/:id` | req | `perm:profile:update:own` | gắn profile `:id` vào **account của người gọi** (từ token) | DONE |
-| 19 | PATCH | `/v1/profiles/:id` | req | `perm:profile:update:own` + `own:profile.account.id` (**ADMIN không bypass**) | multipart avatar/cover; field rỗng → giữ giá trị cũ | DONE |
+| 17 | GET | `/v1/profiles/me` | req | - | hồ sơ của chính người gọi; accountId từ token | DONE |
+| 18 | PUT | `/v1/profiles` | req | `perm:profile:update:own` | multipart `avatar[1]`, `cover[1]` → Cloudinary; hồ sơ tra bằng **accountId từ token**, không có path param | DONE |
+
+> **Đổi so với bản TypeScript** (không phải lệch port — là refactor có chủ ý, xem mục 4.8 của
+> MIGRATION_FINAL_REPORT):
+>
+> - Bỏ `POST /v1/profiles` (tạo hồ sơ rời) và `POST /v1/profiles/:id` (gắn hồ sơ vào account).
+>   Endpoint thứ hai không kiểm sở hữu của `:id` nên gắn được hồ sơ của người khác vào tài khoản mình.
+> - Bỏ `PATCH /v1/profiles/:id`, thay bằng `PUT /v1/profiles`.
+> - Hồ sơ được cấp sẵn lúc tạo tài khoản (`ProfileFactory.seedFor`), người dùng không tự tạo.
+> - Không còn endpoint ghi nào nhận `profileId` → `ProfileAccessGuard` đã bị xoá, module này không
+>   còn tầng ownership.
 
 ## 5. Group — `/v1/groups`
 
@@ -147,9 +156,16 @@ Response chung của 41–43: `{me: {id, username, imageUrl, status?}, others: [
 | # | Method | Endpoint | Auth | AuthZ | Ghi chú | Java |
 |---|---|---|---|---|---|---|
 | 48 | GET | `/v1/messages/:id` | req | `own: sender hoặc receiver` (**bypassRoles rỗng — ADMIN cũng bị chặn**) | | DONE |
-| 49 | PATCH | `/v1/messages/status/:id` | req | như trên | body `{status}` (SENT/DELIVERED/READ) | DONE |
+| 49 | PATCH | `/v1/messages/status/:id` | req | như trên **+ chỉ RECEIVER** | body `{status}`; **không lùi trạng thái** (lùi → no-op, không lỗi) | DONE |
 | 50 | GET | `/v1/messages/me/:id` | req | - | **đối tượng hội thoại lấy từ query `?targetId=`**, `:id` bị bỏ qua; sắp xếp `createdAt DESC` | DONE |
-| 51 | POST | `/v1/messages` | req | - | multipart `image`; body `{content, receiverId}`; **emit socket `chat messsage`** tới room `user_<receiverId>`; response trả lại chính input DTO | DONE |
+| 51 | POST | `/v1/messages` | req | - | multipart `image`; body `{content, receiverId}`; **emit socket `chat messsage`** tới room `user_<receiverId>`; response = input DTO **+ `id`, `status`, `createdAt`** | DONE |
+| 51a | PATCH | `/v1/messages/delivered` | req | lọc trong query: chỉ tin có `receiver = token` | body `{messageIds: []}`; đường lui REST của socket `message delivered`; id lạ bị **bỏ qua âm thầm** | DONE |
+| 51b | PATCH | `/v1/messages/read?partnerId=` | req | reader = token | đánh dấu READ **cả hội thoại** trong một UPDATE | DONE |
+| 51c | GET | `/v1/messages/unread-count` | req | - | `{count}` — mọi tin `receiver = token` và `status <> READ` | DONE |
+
+Trạng thái tin nhắn đi MỘT CHIỀU `SENT → DELIVERED → READ` (`MessageStatus.isAtLeast`). Bảng
+`messages` có thêm `deliveredAt` / `readAt` — `status` chỉ giữ được trạng thái mới nhất nên không
+đủ để hiện "đã nhận lúc … · đã xem lúc …". Migration: `scripts/message-status-migration.sql`.
 
 ## 10. Notification — `/v1/notifications`
 
@@ -209,6 +225,21 @@ Khoá trong response là **`notificationId`** (không phải `id`); REST dùng k
 | server→client | `chat messsage` *(sic — 3 chữ s)* | `{message, from}` → room `user_<receiverId>` | khi POST `/v1/messages` | DONE |
 | server→client | `notification` | `{actorId, receptorId, content, objectType, status, createdAt}` → `user_<receptorId>` | khi POST `/v1/notifications` | DONE |
 | server→client | `change status` | `{notificationId, actorId, receptorId, content, type, status, createdAt}` → room `object_<id>` | khi PUT `/v1/notifications/:id` | DONE |
+| client→server | `message delivered` | `{messageIds: []}` | người nhận ack lô tin đã tới thiết bị | DONE |
+| client→server | `message read` | `{partnerId}` | người nhận mở hội thoại → READ toàn bộ | DONE |
+| server→client | `message status` | `{messageIds, status, at, byUserId}` → room `user_<senderId>` | sau hai sự kiện trên và sau `PATCH /status`, `/delivered`, `/read` | DONE |
+
+Ba sự kiện trạng thái là phần THÊM VÀO của bản Java, bản Express không có. Ghi chú triển khai:
+
+- Danh tính của hai sự kiện client→server lấy từ `client.get("userId")` (do `AuthTokenListener` gắn),
+  **không bao giờ từ payload** — xem `MessageSocketHandlers`.
+- `message status` gộp theo NGƯỜI GỬI: một lần đọc cả hội thoại chỉ tốn một sự kiện cho mỗi người,
+  và không ai thấy id tin nhắn của người khác.
+- Sự kiện chỉ rời server SAU khi transaction commit (service trả `StatusUpdateResult`, caller mới gọi
+  `MessageStatusNotifier`) — bắn từ trong transaction thì người gửi có thể thấy "đã xem" của một
+  transaction sắp rollback.
+- Handler nghiệp vụ đăng ký qua `SocketEventRegistrar` để `realtime` không phải phụ thuộc ngược vào
+  các module nghiệp vụ.
 
 CORS socket: `origin:'*'`, methods GET/POST/PUT/DELETE/PATCH.
 

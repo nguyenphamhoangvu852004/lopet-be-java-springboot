@@ -7,7 +7,7 @@ import com.nguyenvu.lopet.account.dto.AccountViews.AccountBrief;
 
 public final class ProfileDtos {
 
-    /** Chín trường — dùng cho GET /v1/profiles, GET /v1/profiles/accounts/:id và POST /v1/profiles */
+    /** Chín trường — dùng cho GET /v1/profiles, GET /v1/profiles/accounts/:id và GET /v1/profiles/me */
     public record ProfileSummary(
             Integer id,
             String fullName,
@@ -21,9 +21,9 @@ public final class ProfileDtos {
     }
 
     /**
-     * GET /v1/profiles/:id và PATCH /v1/profiles/:id trả về nguyên ENTITY (bản TS truyền thẳng
-     * entity vào constructor DTO, nên mọi thuộc tính của entity — kể cả quan hệ {@code account} đã
-     * nạp và ba cột audit — đều lọt ra ngoài).
+     * GET /v1/profiles/:id và PUT /v1/profiles trả về nguyên ENTITY (bản TS truyền thẳng entity vào
+     * constructor DTO, nên mọi thuộc tính của entity — kể cả quan hệ {@code account} đã nạp và ba
+     * cột audit — đều lọt ra ngoài).
      */
     public record ProfileEntity(
             LocalDateTime createdAt,
@@ -41,25 +41,13 @@ public final class ProfileDtos {
             AccountBrief account) {
     }
 
-    /** setToAccount chỉ gán sáu trường — ba trường còn lại không xuất hiện trong JSON */
-    public record ProfileShort(
-            Integer id,
-            String fullName,
-            String phoneNumber,
-            String bio,
-            String avatarUrl,
-            String coverUrl) {
-    }
-
-    public record CreateProfileRequest(
-            String fullName,
-            String phoneNumber,
-            String bio,
-            String dateOfBirth,
-            String hometown,
-            Integer sex) {
-    }
-
+    /**
+     * Body của {@code PUT /v1/profiles} (biến thể JSON). Không có trường ảnh: đổi avatar/cover chỉ
+     * làm được qua biến thể multipart, vì JSON không mang được file.
+     *
+     * <p>Không có annotation validation — port nguyên trạng từ bản TypeScript vốn không có schema
+     * Joi cho endpoint này.
+     */
     public record UpdateProfileRequest(
             String fullName,
             String phoneNumber,

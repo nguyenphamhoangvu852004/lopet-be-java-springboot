@@ -8,9 +8,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.nguyenvu.lopet.account.AccountMapper;
-import com.nguyenvu.lopet.account.entity.Account;
-import com.nguyenvu.lopet.account.repository.AccountRepository;
-import com.nguyenvu.lopet.common.exception.BadRequestException;
 import com.nguyenvu.lopet.common.exception.NotFoundException;
 import com.nguyenvu.lopet.profile.dto.ProfileDtos;
 import com.nguyenvu.lopet.profile.entity.Profile;
@@ -23,7 +20,6 @@ import lombok.RequiredArgsConstructor;
 public class ProfileService {
 
     private final ProfileRepository profileRepository;
-    private final AccountRepository accountRepository;
 
     @Transactional(readOnly = true)
     public List<ProfileDtos.ProfileSummary> findAll(Integer id, String fullName) {
@@ -43,37 +39,26 @@ public class ProfileService {
     }
 
     /**
-     * Tạo hồ sơ RỜI, chưa gắn vào tài khoản nào — việc gắn là bước riêng qua
-     * {@link #setToAccount(Integer, Integer)}. Giữ nguyên mô hình hai bước của backend cũ.
+     * Cập nhật hồ sơ CỦA CHÍNH NGƯỜI GỌI. Hồ sơ được tra bằng {@code accountId} lấy từ token chứ
+     * không phải {@code profileId} trên URL — đó là lý do module này không còn cần tầng ownership:
+     * không có tham số nào để trỏ sang hồ sơ của người khác.
+     *
+     * <p>Ngữ nghĩa MERGE: {@code null} giữ nguyên trường cũ, mọi giá trị khác (kể cả chuỗi rỗng)
+     * thì ghi đè. Chuỗi rỗng vẫn ghi đè là có chủ ý — người dùng phải xoá được bio của mình.
+     *
+     * <p>Khác với bản cũ: controller giờ truyền {@code null} cho {@code avatarUrl}/{@code coverUrl}
+     * khi request không đính file, thay vì chuỗi rỗng. Bản cũ luôn truyền chuỗi rỗng nên mỗi lần
+     * sửa bio không kèm ảnh là XOÁ luôn avatar — đó là bug, không phải tính năng.
      */
     @Transactional
-    public ProfileDtos.ProfileSummary create(String fullName, String phoneNumber, String bio,
-                                              LocalDate dateOfBirth, String hometown, Integer sex,
-                                              String avatarUrl, String coverUrl) {
-        Profile profile = profileRepository.save(Profile.builder()
-                .fullName(orEmpty(fullName))
-                .phoneNumber(orEmpty(phoneNumber))
-                .bio(orEmpty(bio))
-                .avatarUrl(orEmpty(avatarUrl))
-                .coverUrl(orEmpty(coverUrl))
-                .dateOfBirth(dateOfBirth)
-                .hometown(hometown)
-                .sex(sex)
-                .build());
-        return toSummary(profile);
-    }
-
-    /**
-     * Cập nhật hồ sơ. Giá trị {@code null} giữ nguyên trường cũ, nhưng CHUỖI RỖNG thì ghi đè —
-     * bản TS dùng {@code data.x ?? profile.x}, mà {@code ??} không bắt chuỗi rỗng. Hệ quả có thật:
-     * PATCH không kèm file ảnh sẽ XOÁ avatarUrl/coverUrl, vì controller cũ luôn truyền chuỗi rỗng
-     * cho hai trường đó. Hành vi này được giữ nguyên và ghi lại ở MIGRATION_FINAL_REPORT.
-     */
-    @Transactional
-    public ProfileDtos.ProfileEntity update(Integer id, String fullName, String phoneNumber, String bio,
-                                             String avatarUrl, String coverUrl, LocalDate dateOfBirth,
-                                             String hometown, Integer sex) {
-        Profile profile = profileRepository.findDetailById(id).orElseThrow(BadRequestException::new);
+    public ProfileDtos.ProfileEntity updateMine(Integer accountId, String fullName, String phoneNumber,
+                                                 String bio, String avatarUrl, String coverUrl,
+                                                 LocalDate dateOfBirth, String hometown, Integer sex) {
+        // Không tìm thấy nghĩa là tài khoản có từ trước refactor và chưa được backfill — xem
+        // scripts/profile-refactor-migration.sql. Tài khoản tạo mới luôn có hồ sơ ngay từ đầu.
+        Profile profile = profileRepository.findByAccountId(accountId)
+                .orElseThrow(() -> new NotFoundException(
+                        "Tài khoản chưa có hồ sơ — cần chạy backfill trong scripts/profile-refactor-migration.sql"));
 
         if (fullName != null) {
             profile.setFullName(fullName);
@@ -104,19 +89,6 @@ public class ProfileService {
         return toEntityView(profileRepository.save(profile));
     }
 
-    /** accountId lấy từ token, không nhận từ body — nếu không thì gắn được hồ sơ vào tài khoản người khác */
-    @Transactional
-    public ProfileDtos.ProfileShort setToAccount(Integer profileId, Integer accountId) {
-        Profile profile = profileRepository.findDetailById(profileId).orElseThrow(BadRequestException::new);
-        Account account = accountRepository.findById(accountId).orElseThrow(BadRequestException::new);
-
-        account.setProfile(profile);
-        accountRepository.save(account);
-
-        return new ProfileDtos.ProfileShort(profile.getId(), profile.getFullName(), profile.getPhoneNumber(),
-                profile.getBio(), profile.getAvatarUrl(), profile.getCoverUrl());
-    }
-
     static ProfileDtos.ProfileSummary toSummary(Profile profile) {
         return new ProfileDtos.ProfileSummary(profile.getId(), profile.getFullName(), profile.getPhoneNumber(),
                 profile.getBio(), profile.getAvatarUrl(), profile.getCoverUrl(), profile.getDateOfBirth(),
@@ -128,9 +100,5 @@ public class ProfileService {
                 profile.getDeletedAt(), profile.getId(), profile.getFullName(), profile.getPhoneNumber(),
                 profile.getBio(), profile.getSex(), profile.getDateOfBirth(), profile.getHometown(),
                 profile.getAvatarUrl(), profile.getCoverUrl(), AccountMapper.toBrief(profile.getAccount()));
-    }
-
-    private static String orEmpty(String value) {
-        return value == null ? "" : value;
     }
 }

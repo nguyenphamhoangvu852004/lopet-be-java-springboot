@@ -8,12 +8,16 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
+import com.corundumstudio.socketio.namespace.Namespace;
 import com.nguyenvu.lopet.config.JacksonConfig;
+import com.nguyenvu.lopet.message.dto.MessageDtos;
+import com.nguyenvu.lopet.message.entity.MessageStatus;
 import com.nguyenvu.lopet.notification.dto.NotificationDtos;
 import com.nguyenvu.lopet.notification.entity.NotificationObjectType;
 import com.nguyenvu.lopet.notification.entity.NotificationStatus;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.ByteBufOutputStream;
 import io.netty.buffer.Unpooled;
 
@@ -50,6 +54,49 @@ class SocketIoJsonSupportTest {
 
         assertThat(serialize(List.of("change status", response)))
                 .contains("\"createdAt\":\"" + JacksonConfig.nodeIso(CREATED_AT) + "\"");
+    }
+
+    @Test
+    void su_kien_message_status_mang_ca_danh_sach_id_lan_moc_thoi_gian() throws Exception {
+        MessageDtos.MessageStatusEvent event = new MessageDtos.MessageStatusEvent(
+                List.of(11, 12), MessageStatus.READ, CREATED_AT, 4);
+
+        assertThat(serialize(List.of("message status", event)))
+                .contains("\"messageIds\":[11,12]")
+                .contains("\"status\":\"READ\"")
+                .contains("\"at\":\"" + JacksonConfig.nodeIso(CREATED_AT) + "\"")
+                .contains("\"byUserId\":4");
+    }
+
+    /**
+     * Chiều NGƯỢC LẠI — payload client gửi lên. Đây là lý do {@code DeliveredAckRequest} là class
+     * thường chứ không phải record: ObjectMapper của netty-socketio không được nạp module
+     * {@code parameter-names}, nên record chỉ deserialize được nhờ hỗ trợ sẵn của Jackson. Test này
+     * chốt việc payload dựng được thật, thay vì tin vào phiên bản Jackson mà netty-socketio kéo theo.
+     */
+    @Test
+    void ack_da_nhan_tu_client_deserialize_duoc() throws Exception {
+        MessageDtos.DeliveredAckRequest request =
+                deserialize("{\"messageIds\":[7,8,9]}", MessageDtos.DeliveredAckRequest.class);
+
+        assertThat(request.getMessageIds()).containsExactly(7, 8, 9);
+    }
+
+    @Test
+    void ack_da_xem_tu_client_deserialize_duoc() throws Exception {
+        MessageDtos.ReadAckRequest request =
+                deserialize("{\"partnerId\":42}", MessageDtos.ReadAckRequest.class);
+
+        assertThat(request.getPartnerId()).isEqualTo(42);
+    }
+
+    private <T> T deserialize(String json, Class<T> type) throws Exception {
+        ByteBuf buffer = Unpooled.copiedBuffer(json, StandardCharsets.UTF_8);
+        try (ByteBufInputStream in = new ByteBufInputStream(buffer)) {
+            return SocketIoConfig.socketJsonSupport().readValue(Namespace.DEFAULT_NAME, in, type);
+        } finally {
+            buffer.release();
+        }
     }
 
     private String serialize(Object value) throws Exception {

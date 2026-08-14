@@ -1,5 +1,7 @@
 package com.nguyenvu.lopet.message.entity;
 
+import java.time.LocalDateTime;
+
 import org.hibernate.annotations.SQLRestriction;
 
 import com.nguyenvu.lopet.account.entity.Account;
@@ -55,4 +57,18 @@ public class Message extends BaseEntity {
     @Column(name = "status", nullable = false,
             columnDefinition = "enum('SENT','DELIVERED','READ') not null default 'SENT'")
     private MessageStatus status = MessageStatus.SENT;
+
+    /**
+     * Mốc người nhận xác nhận đã nhận được tin (ack từ socket), NULL khi chưa tới thiết bị nào.
+     *
+     * <p>Vì sao cần cả cột thời gian khi đã có {@code status}: {@code status} chỉ giữ được trạng thái
+     * MỚI NHẤT, nên khi tin nhảy thẳng lên READ thì thời điểm nhận biến mất. Giao diện muốn hiện
+     * "đã nhận lúc 14:03 · đã xem lúc 14:07" thì phải có hai mốc riêng.
+     */
+    @Column(name = "deliveredAt")
+    private LocalDateTime deliveredAt;
+
+    /** Mốc người nhận mở hội thoại và nhìn thấy tin. NULL khi chưa xem. */
+    @Column(name = "readAt")
+    private LocalDateTime readAt;
 }

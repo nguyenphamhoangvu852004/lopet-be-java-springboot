@@ -540,9 +540,13 @@ Ký hiệu: `req` = `@Auth` (mặc định `required=true`) · `opt` = `@Auth(re
 | `/v1/friendships/accept`, `/reject` | POST | req | — | receiver = token | `:76`, `:85` |
 | `/v1/friendships` | DELETE | req | — | một đầu = token | `:94` |
 | `/v1/messages/{id}` | GET | req | — | `MessageAccessGuard.requireParticipant` (**NO_BYPASS**) | `MessageController.java:39` |
-| `/v1/messages/status/{id}` | PATCH | req | — | `MessageAccessGuard.requireParticipant` | `:46` |
+| `/v1/messages/status/{id}` | PATCH | req | — | `requireParticipant` **+ chỉ RECEIVER** (guard một mình cho phép cả người gửi) | `:46` |
 | `/v1/messages/me/{id}` | GET | req | — | `{id}` bị bỏ qua, cặp hội thoại = (token, `?targetId`) | `:60` |
 | `/v1/messages` (multipart/json) | POST | req | — | sender = token | `:68`, `:79` |
+| `/v1/messages/delivered` | PATCH | req | — | **không dùng guard**: lọc `receiver = token` ngay trong truy vấn, id lạ bị bỏ qua thay vì 403 cả lô | `MessageService.markDelivered` |
+| `/v1/messages/read` | PATCH | req | — | reader = token, đối phương = `?partnerId` | `MessageService.markConversationRead` |
+| `/v1/messages/unread-count` | GET | req | — | chỉ đếm tin của token | `MessageService.countUnread` |
+| socket `message delivered` / `message read` | — | req | — | danh tính từ `client.get("userId")`, **không từ payload** | `MessageSocketHandlers` |
 | `/v1/notifications` | POST | req | — | actor = token | `NotificationController.java:31` |
 | `/v1/notifications/{id}` | GET | req | — | **không có** (xem §18 `SEC-7`) | `:52` |
 | `/v1/notifications/me/{id}` | GET | req | — | `{id}` bị bỏ qua | `:59` |
