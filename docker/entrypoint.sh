@@ -78,7 +78,7 @@ wait_for_port() {
 # Bind vào 127.0.0.1: chỉ nginx cùng container mới gọi được, không có đường nào từ ngoài
 # chạm thẳng vào Tomcat hay Socket.IO.
 echo "entrypoint: PORT=$PORT, upstream REST=$REST_PORT, upstream Socket.IO=$SOCK_PORT"
-exec java $JAVA_OPTS org.springframework.boot.loader.launch.JarLauncher \
+exec java $JAVA_OPTS -jar /app/app.jar \
     --server.address=127.0.0.1 \
     --server.port="$REST_PORT" \
     --lopet.socket.hostname=127.0.0.1 \
