@@ -30,6 +30,9 @@ spring:
         format_sql: false
         default_batch_fetch_size: 32
     hibernate:
+      # Đặt `update` để Hibernate tự sinh hai bảng mới `pets` và `pet_ownerships` — dự án không dùng
+      # Flyway/Liquibase nên không có đường nào khác để tạo bảng ngoài DDL thủ công.
+      # Lưu ý: giá trị này áp cho TOÀN BỘ entity, không riêng hai bảng mới.
       ddl-auto: none
       naming:
         # BẮT BUỘC. Mặc định của Spring Boot (CamelCaseToUnderscoresNamingStrategy) đổi cả tên cột

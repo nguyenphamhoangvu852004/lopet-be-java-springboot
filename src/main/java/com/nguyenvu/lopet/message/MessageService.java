@@ -1,5 +1,7 @@
 package com.nguyenvu.lopet.message;
 
+import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
@@ -8,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.nguyenvu.lopet.account.entity.Account;
 import com.nguyenvu.lopet.account.repository.AccountRepository;
 import com.nguyenvu.lopet.common.exception.BadRequestException;
+import com.nguyenvu.lopet.common.exception.ForbiddenException;
 import com.nguyenvu.lopet.common.exception.NotFoundException;
 import com.nguyenvu.lopet.message.dto.MessageDtos;
 import com.nguyenvu.lopet.message.entity.Message;
@@ -43,18 +46,102 @@ public class MessageService {
                 .orElseThrow(() -> new NotFoundException("Message not found")));
     }
 
+    /**
+     * Đổi trạng thái MỘT tin nhắn.
+     *
+     * <p>Chặt hơn bản cũ ở hai điểm, và cả hai đều là lỗ hổng chứ không phải lựa chọn thiết kế:
+     * <ul>
+     *   <li>chỉ NGƯỜI NHẬN được đánh dấu — {@link MessageAccessGuard} chỉ kiểm "là một trong hai
+     *       bên", nên trước đây người gửi tự đặt tin của mình thành READ và giả được dấu đã xem;</li>
+     *   <li>không lùi trạng thái — nếu không, người nhận gửi một request là xoá sạch dấu đã xem
+     *       vừa để lại.</li>
+     * </ul>
+     *
+     * <p>Yêu cầu lùi trạng thái KHÔNG ném lỗi mà trả về kết quả rỗng: client thường gửi lại ack sau
+     * mỗi lần reconnect, và một tin đã READ nhận lại ack DELIVERED là chuyện bình thường chứ không
+     * phải lỗi cần báo cho người dùng.
+     */
     @Transactional
-    public MessageDtos.ChangeStatusResponse changeStatus(Integer id, MessageStatus status) {
+    public MessageDtos.StatusUpdateResult changeStatus(Integer actorId, Integer id, MessageStatus status) {
         Message message = messageRepository.findDetailById(id)
                 .orElseThrow(() -> new NotFoundException("Message not found"));
-        message.setStatus(status);
-        messageRepository.save(message);
-        return new MessageDtos.ChangeStatusResponse(true, "Update message successfully");
+
+        if (message.getReceiver() == null || !message.getReceiver().getId().equals(actorId)) {
+            throw new ForbiddenException("Chỉ người nhận mới đổi được trạng thái tin nhắn");
+        }
+        if (message.getStatus().isAtLeast(status)) {
+            return MessageDtos.StatusUpdateResult.empty(message.getStatus(), actorId);
+        }
+
+        List<MessageDtos.StatusChange> changes =
+                List.of(new MessageDtos.StatusChange(message.getId(), message.getSender().getId()));
+        return applyStatus(changes, status, actorId);
     }
 
     /**
-     * Trả về CHÍNH dữ liệu đầu vào chứ không phải bản ghi vừa lưu — đúng như bản TS. Nghĩa là client
-     * không nhận được id tin nhắn từ response này, và payload socket cũng mang đúng hình dạng đó.
+     * Ack "đã nhận" theo lô — người nhận báo lại rằng những tin này đã tới thiết bị của họ.
+     *
+     * <p>Id không hợp lệ (của người khác, đã xoá, hoặc đã DELIVERED/READ rồi) bị lọc âm thầm ở
+     * {@code findPendingDelivery} thay vì ném lỗi. Ack là thông tin một chiều từ client: nó có thể
+     * gửi trùng sau mỗi lần reconnect, và một lô hỗn hợp không nên làm hỏng cả request.
+     */
+    @Transactional
+    public MessageDtos.StatusUpdateResult markDelivered(Integer receiverId, Collection<Integer> messageIds) {
+        if (messageIds == null || messageIds.isEmpty()) {
+            return MessageDtos.StatusUpdateResult.empty(MessageStatus.DELIVERED, receiverId);
+        }
+        return applyStatus(
+                toChanges(messageRepository.findPendingDelivery(messageIds, receiverId, MessageStatus.SENT)),
+                MessageStatus.DELIVERED, receiverId);
+    }
+
+    /**
+     * Đánh dấu đã xem TOÀN BỘ hội thoại với một người, trong một câu UPDATE.
+     *
+     * <p>Đây là ngữ nghĩa đúng của giao diện chat: người dùng mở cuộc trò chuyện là thấy hết, không
+     * ai đọc lẻ từng tin. Làm theo từng id thì client phải gọi N request cho một lần mở hội thoại.
+     */
+    @Transactional
+    public MessageDtos.StatusUpdateResult markConversationRead(Integer readerId, Integer partnerId) {
+        requireAccount(partnerId, "Sender not found");
+        return applyStatus(
+                toChanges(messageRepository.findPendingRead(readerId, partnerId, MessageStatus.READ)),
+                MessageStatus.READ, readerId);
+    }
+
+    @Transactional(readOnly = true)
+    public long countUnread(Integer accountId) {
+        return messageRepository.countUnread(accountId, MessageStatus.READ);
+    }
+
+    /** Chọn ứng viên rồi mới UPDATE theo đúng danh sách id đó — xem {@code MessageRepository.StatusTarget} */
+    private MessageDtos.StatusUpdateResult applyStatus(List<MessageDtos.StatusChange> changes,
+                                                        MessageStatus status, Integer actorId) {
+        if (changes.isEmpty()) {
+            return MessageDtos.StatusUpdateResult.empty(status, actorId);
+        }
+        LocalDateTime now = LocalDateTime.now();
+        List<Integer> ids = changes.stream().map(MessageDtos.StatusChange::messageId).toList();
+
+        if (status == MessageStatus.READ) {
+            messageRepository.applyRead(ids, status, now);
+        } else {
+            messageRepository.applyDelivered(ids, status, now);
+        }
+        return new MessageDtos.StatusUpdateResult(status, now, actorId, changes);
+    }
+
+    private List<MessageDtos.StatusChange> toChanges(List<MessageRepository.StatusTarget> targets) {
+        return targets.stream()
+                .map(target -> new MessageDtos.StatusChange(target.getId(), target.getSenderId()))
+                .toList();
+    }
+
+    /**
+     * Bốn trường đầu của response là CHÍNH dữ liệu đầu vào, giữ nguyên hình dạng của bản TS; ba
+     * trường cuối lấy từ bản ghi vừa lưu. {@code id} là bắt buộc cho luồng trạng thái: người nhận
+     * cần nó để ack "đã nhận", người gửi cần nó để biết sự kiện {@code message status} nói về tin
+     * nào trên màn hình.
      */
     @Transactional
     public MessageDtos.CreateMessageResponse create(String senderId, String receiverId, String content,
@@ -62,7 +149,7 @@ public class MessageService {
         Account sender = requireAccount(Integer.valueOf(senderId), "Sender not found");
         Account receiver = requireAccount(Integer.valueOf(receiverId), "Receiver not found");
 
-        messageRepository.save(Message.builder()
+        Message saved = messageRepository.save(Message.builder()
                 .content(content)
                 .sender(sender)
                 .receiver(receiver)
@@ -70,7 +157,8 @@ public class MessageService {
                 .status(MessageStatus.SENT)
                 .build());
 
-        return new MessageDtos.CreateMessageResponse(senderId, receiverId, content, imageUrl);
+        return new MessageDtos.CreateMessageResponse(senderId, receiverId, content, imageUrl,
+                saved.getId(), saved.getStatus(), saved.getCreatedAt());
     }
 
     private Account requireAccount(Integer id, String message) {
@@ -83,6 +171,7 @@ public class MessageService {
     private MessageDtos.MessageResponse toResponse(Message message) {
         return new MessageDtos.MessageResponse(message.getId(), message.getSender().getId(),
                 message.getReceiver().getId(), message.getContent(), message.getMediaUrl(),
-                message.getCreatedAt(), message.getStatus());
+                message.getCreatedAt(), message.getStatus(),
+                message.getDeliveredAt(), message.getReadAt());
     }
 }

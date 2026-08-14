@@ -1,5 +1,6 @@
 package com.nguyenvu.lopet.realtime;
 
+import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -33,6 +34,9 @@ public class SocketIoServerRunner implements SmartLifecycle {
 
     private final SocketIOServer socketIOServer;
 
+    /** Handler của các module nghiệp vụ — xem {@link SocketEventRegistrar} */
+    private final List<SocketEventRegistrar> eventRegistrars;
+
     @Value("${lopet.socket.port:8081}")
     private int port;
 
@@ -65,6 +69,9 @@ public class SocketIoServerRunner implements SmartLifecycle {
             client.joinRoom(room);
             log.info("{} joined room {}", client.getSessionId(), room);
         });
+
+        // Phải chạy TRƯỚC start(): netty-socketio khoá danh sách listener lại khi server đã chạy
+        eventRegistrars.forEach(registrar -> registrar.register(socketIOServer));
 
         try {
             socketIOServer.start();

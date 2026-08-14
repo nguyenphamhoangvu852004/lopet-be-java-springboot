@@ -5,6 +5,12 @@ server:
   port: 0
 
 spring:
+  jpa:
+    hibernate:
+      # Ghi đè tường minh, không dựa vào giá trị của application.yml: mỗi test class dùng một database
+      # rỗng (createDatabaseIfNotExist=true), nên thiếu bước sinh schema là toàn bộ test tích hợp vỡ.
+      ddl-auto: update
+
   # spring.datasource.url được từng test class ghi đè qua @DynamicPropertySource
   # (xem IntegrationTestBase.jdbcUrl) để mỗi bộ test có database riêng.
   datasource:
@@ -12,8 +18,12 @@ spring:
     username: root
     password: nguyenvu
 
+  # `url` PHẢI có mặt: application.yml khai `spring.data.redis.url: ${REDIS_URL}`, và khi không có
+  # file .env thì chuỗi `${REDIS_URL}` đi nguyên văn xuống Lettuce -> "Invalid Redis URL" làm vỡ context
+  # của MọI test tích hợp. Chỉ khai host/port là không đủ vì `url` được ưu tiên hơn.
   data:
     redis:
+      url: redis://localhost:6379
       host: localhost
       port: 6379
 

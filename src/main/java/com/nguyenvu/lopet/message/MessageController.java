@@ -35,6 +35,7 @@ public class MessageController {
     private final MessageAccessGuard messageAccessGuard;
     private final CloudinaryService cloudinaryService;
     private final RealtimeGateway realtimeGateway;
+    private final MessageStatusNotifier messageStatusNotifier;
 
     @GetMapping("/{id}")
     @Auth
@@ -43,13 +44,58 @@ public class MessageController {
         return ApiResponse.ok("Get detail message successfully", messageService.getDetail(id));
     }
 
+    /**
+     * Giữ nguyên đường dẫn và hình dạng response của bản cũ, nhưng nay chỉ NGƯỜI NHẬN gọi được và
+     * trạng thái không lùi được — luật nằm trong {@link MessageService#changeStatus}.
+     */
     @PatchMapping("/status/{id}")
     @Auth
     public ApiResponse<MessageDtos.ChangeStatusResponse> updateStatus(
             @PathVariable Integer id, @RequestBody MessageDtos.ChangeStatusRequest request) {
         messageAccessGuard.requireParticipant(id);
+        messageStatusNotifier.broadcast(messageService.changeStatus(CurrentUser.require().id(), id,
+                MessageStatus.valueOf(request.status())));
         return ApiResponse.ok("Update message successfully",
-                messageService.changeStatus(id, MessageStatus.valueOf(request.status())));
+                new MessageDtos.ChangeStatusResponse(true, "Update message successfully"));
+    }
+
+    /**
+     * Đường lui REST cho ack "đã nhận", tương đương sự kiện socket {@code message delivered} —
+     * dùng khi client không giữ được socket (app vừa mở lại, mạng chập chờn).
+     *
+     * <p>Không có {@code messageAccessGuard} ở đây một cách CÓ CHỦ Ý: guard làm việc trên từng id
+     * và sẽ ném 403 cho cả lô chỉ vì một id lạc. Việc lọc nằm trong câu truy vấn — nó chỉ nhận
+     * những tin có {@code receiver} đúng là người gọi, nên id của người khác âm thầm bị bỏ qua.
+     */
+    @PatchMapping("/delivered")
+    @Auth
+    public ApiResponse<MessageDtos.MarkStatusResponse> markDelivered(
+            @RequestBody MessageDtos.DeliveredAckRequest request) {
+        MessageDtos.StatusUpdateResult result =
+                messageService.markDelivered(CurrentUser.require().id(), request.getMessageIds());
+        messageStatusNotifier.broadcast(result);
+        return ApiResponse.ok("Mark messages delivered successfully",
+                new MessageDtos.MarkStatusResponse(result.count(), MessageStatus.DELIVERED));
+    }
+
+    /** Đánh dấu đã xem cả hội thoại với {@code partnerId} — một request cho một lần mở cuộc trò chuyện */
+    @PatchMapping("/read")
+    @Auth
+    public ApiResponse<MessageDtos.MarkStatusResponse> markRead(@RequestParam Integer partnerId) {
+        MessageDtos.StatusUpdateResult result =
+                messageService.markConversationRead(CurrentUser.require().id(), partnerId);
+        messageStatusNotifier.broadcast(result);
+        return ApiResponse.ok("Mark conversation read successfully",
+                new MessageDtos.MarkStatusResponse(result.count(), MessageStatus.READ));
+    }
+
+    /** Badge tổng số tin chưa đọc của người gọi */
+    @GetMapping("/unread-count")
+    @Auth
+    public ApiResponse<MessageDtos.UnreadCountResponse> unreadCount() {
+        return ApiResponse.ok("Get unread count successfully",
+                new MessageDtos.UnreadCountResponse(
+                        messageService.countUnread(CurrentUser.require().id())));
     }
 
     /**
