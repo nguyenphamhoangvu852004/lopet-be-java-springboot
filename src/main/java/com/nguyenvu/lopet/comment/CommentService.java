@@ -15,6 +15,7 @@ import com.nguyenvu.lopet.comment.dto.CommentDtos;
 import com.nguyenvu.lopet.comment.entity.Comment;
 import com.nguyenvu.lopet.comment.repository.CommentRepository;
 import com.nguyenvu.lopet.common.exception.BadRequestException;
+import com.nguyenvu.lopet.notification.NotificationPublisher;
 import com.nguyenvu.lopet.post.entity.Post;
 import com.nguyenvu.lopet.post.repository.PostRepository;
 import com.nguyenvu.lopet.profile.entity.Profile;
@@ -35,6 +36,7 @@ public class CommentService {
 
     private final CommentRepository commentRepository;
     private final PostRepository postRepository;
+    private final NotificationPublisher notificationPublisher;
     private final AccountRepository accountRepository;
     private final ProfileRepository profileRepository;
 
@@ -68,6 +70,8 @@ public class CommentService {
                 .parent(parent)
                 .post(post)
                 .build());
+
+        notificationPublisher.postCommented(accountId, post.getAccount().getId(), post.getId());
 
         return new CommentDtos.CreateCommentResponse(saved.getId());
     }

@@ -16,6 +16,7 @@ import com.nguyenvu.lopet.message.dto.MessageDtos;
 import com.nguyenvu.lopet.message.entity.Message;
 import com.nguyenvu.lopet.message.entity.MessageStatus;
 import com.nguyenvu.lopet.message.repository.MessageRepository;
+import com.nguyenvu.lopet.notification.NotificationPublisher;
 
 import lombok.RequiredArgsConstructor;
 
@@ -25,6 +26,7 @@ public class MessageService {
 
     private final MessageRepository messageRepository;
     private final AccountRepository accountRepository;
+    private final NotificationPublisher notificationPublisher;
 
     @Transactional(readOnly = true)
     public List<MessageDtos.MessageResponse> getConversation(Integer callerId, Integer targetId) {
@@ -109,6 +111,21 @@ public class MessageService {
                 MessageStatus.READ, readerId);
     }
 
+    /**
+     * Id những tin đang chờ người này ack "đã nhận".
+     *
+     * <p>CHỈ đọc, không tự đánh dấu. Việc đánh dấu vẫn phải do client phát ack như mọi đường khác —
+     * xem {@link MessageSocketHandlers}: server tự suy ra DELIVERED chỉ vì thấy có kết nối sống thì
+     * dấu "đã nhận" mất hết ý nghĩa. Ở đây client tải danh sách id về máy mình rồi mới ack, nên nó
+     * ack đúng thứ nó thật sự cầm trong tay.
+     */
+    @Transactional(readOnly = true)
+    public List<Integer> awaitingDelivery(Integer receiverId) {
+        return messageRepository.findAwaitingDelivery(receiverId, MessageStatus.SENT).stream()
+                .map(MessageRepository.StatusTarget::getId)
+                .toList();
+    }
+
     @Transactional(readOnly = true)
     public long countUnread(Integer accountId) {
         return messageRepository.countUnread(accountId, MessageStatus.READ);
@@ -156,6 +173,10 @@ public class MessageService {
                 .mediaUrl(imageUrl == null ? "" : imageUrl)
                 .status(MessageStatus.SENT)
                 .build());
+
+        // Thông báo sinh ở đây chứ không ở controller: cùng transaction với bản ghi tin nhắn, nên
+        // không bao giờ có thông báo trỏ tới một tin chưa được lưu.
+        notificationPublisher.messageSent(sender.getId(), receiver.getId(), saved.getId());
 
         return new MessageDtos.CreateMessageResponse(senderId, receiverId, content, imageUrl,
                 saved.getId(), saved.getStatus(), saved.getCreatedAt());

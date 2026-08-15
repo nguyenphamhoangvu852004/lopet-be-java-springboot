@@ -61,6 +61,25 @@ public interface MessageRepository extends JpaRepository<Message, Integer> {
                                            @Param("receiverId") Integer receiverId,
                                            @Param("status") MessageStatus status);
 
+    /**
+     * Mọi tin đang chờ ack "đã nhận" của một người, không giới hạn hội thoại nào.
+     *
+     * <p>Dành cho lúc client vừa online trở lại: tin đến trong khi họ đăng xuất không được socket
+     * nào chuyển tới, nên không có ack nào từng được phát và chúng nằm lại ở SENT vĩnh viễn. Không
+     * có câu này thì "đã nhận" chỉ hoạt động cho người đang mở sẵn ứng dụng.
+     *
+     * <p>Dùng chung index {@code idx_messages_receiver_sender_status}: cột {@code receiver_id} đứng
+     * đầu nên tiền tố (receiver_id) vẫn được dùng, dù index sinh ra cho truy vấn ba cột.
+     */
+    @Query("""
+            select m.id as id, m.sender.id as senderId
+            from Message m
+            where m.receiver.id = :receiverId
+              and m.status = :status
+            """)
+    List<StatusTarget> findAwaitingDelivery(@Param("receiverId") Integer receiverId,
+                                            @Param("status") MessageStatus status);
+
     /** Mọi tin của một hội thoại mà người đọc chưa xem — dùng cho "đánh dấu đã xem cả hội thoại" */
     @Query("""
             select m.id as id, m.sender.id as senderId

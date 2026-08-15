@@ -52,8 +52,23 @@ public class Notification extends BaseEntity {
     private String content;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "objectType", nullable = false, columnDefinition = "enum('POST','MESSAGE') not null")
+    @Column(name = "objectType", nullable = false, columnDefinition = "enum('POST_LIKE','POST_COMMENT',"
+            + "'MESSAGE','FRIEND_REQUEST','FRIEND_ACCEPTED','POST') not null")
     private NotificationObjectType objectType;
+
+    /**
+     * Id của đối tượng mà thông báo nói tới — bài viết, tin nhắn, hoặc người liên quan, tuỳ
+     * {@link NotificationObjectType}.
+     *
+     * <p>Nullable vì hai lý do, đừng siết thành NOT NULL: bản ghi cũ sinh ra trước khi có cột này
+     * không có gì để backfill, và loại {@link NotificationObjectType#POST} cũ vốn không trỏ tới đâu.
+     *
+     * <p>Không đặt khoá ngoại: cột trỏ tới ba bảng khác nhau tuỳ loại, nên không có một bảng đích cố
+     * định để tham chiếu. Đổi lại, đối tượng bị xoá thì thông báo vẫn còn và frontend phải chịu được
+     * việc bấm vào một đích không còn tồn tại.
+     */
+    @Column(name = "objectId")
+    private Integer objectId;
 
     @Builder.Default
     @Enumerated(EnumType.STRING)

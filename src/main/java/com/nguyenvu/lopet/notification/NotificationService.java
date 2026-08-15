@@ -29,9 +29,16 @@ public class NotificationService {
     private final ProfileRepository profileRepository;
 
     /**
-     * Actor/receptor không tồn tại được ném dưới dạng lỗi 500 kèm nguyên văn message — bản TS dùng
-     * {@code new Error(...)} chứ không phải lớp HttpError, nên {@code error.code} là undefined và
-     * handler trung tâm rơi về 500.
+     * Tạo thông báo THỦ CÔNG qua REST.
+     *
+     * <p>Không còn là đường chính: mọi thông báo của ứng dụng nay do {@link NotificationPublisher}
+     * sinh ra ngay trong service của hành động tương ứng, kèm {@code objectId} để bấm vào được.
+     * Endpoint này giữ lại cho client cũ, và vì thế thông báo nó tạo ra không có {@code objectId} —
+     * hiện được nhưng không dẫn đi đâu.
+     *
+     * <p>Actor/receptor không tồn tại được ném dưới dạng lỗi 500 kèm nguyên văn message — bản TS
+     * dùng {@code new Error(...)} chứ không phải lớp HttpError, nên {@code error.code} là undefined
+     * và handler trung tâm rơi về 500.
      */
     @Transactional
     public NotificationDtos.CreateNotificationResponse create(Integer actorId, Integer receptorId, String content,
@@ -48,20 +55,19 @@ public class NotificationService {
                 .status(NotificationStatus.SENT)
                 .build();
 
-        // Chỉ hai giá trị này được chấp nhận; bất kỳ chuỗi nào khác để cột objectType là null và
-        // vi phạm ràng buộc NOT NULL — đúng như bản TS, nơi hai câu if đơn giản không có nhánh else.
-        if ("POST".equals(objectType)) {
-            notification.setObjectType(NotificationObjectType.POST);
-        }
-        if ("MESSAGE".equals(objectType)) {
-            notification.setObjectType(NotificationObjectType.MESSAGE);
+        // Nhận đúng tên các hằng số của enum. Chuỗi lạ để cột objectType là null và vi phạm ràng
+        // buộc NOT NULL — đúng như bản TS, nơi hai câu if đơn giản không có nhánh else.
+        try {
+            notification.setObjectType(NotificationObjectType.valueOf(objectType));
+        } catch (IllegalArgumentException | NullPointerException ignored) {
+            // Giữ nguyên hành vi cũ: không ném ở đây, để ràng buộc cột từ chối bản ghi
         }
 
         Notification saved = notificationRepository.save(notification);
 
         return new NotificationDtos.CreateNotificationResponse(saved.getId(), actor.getId(),
-                receptor.getId(), saved.getContent(), saved.getObjectType(), saved.getStatus(),
-                saved.getCreatedAt());
+                receptor.getId(), saved.getContent(), saved.getObjectType(), saved.getObjectId(),
+                saved.getStatus(), saved.getCreatedAt());
     }
 
     @Transactional(readOnly = true)
@@ -74,7 +80,8 @@ public class NotificationService {
                         notification.getContent(),
                         notification.getCreatedAt(),
                         notification.getStatus(),
-                        notification.getObjectType()))
+                        notification.getObjectType(),
+                        notification.getObjectId()))
                 .toList();
     }
 
@@ -90,6 +97,7 @@ public class NotificationService {
                 notification.getContent(),
                 notification.getStatus(),
                 notification.getObjectType(),
+                notification.getObjectId(),
                 notification.getCreatedAt(),
                 notification.getUpdatedAt(),
                 notification.getDeletedAt());
@@ -111,7 +119,7 @@ public class NotificationService {
         Notification saved = notificationRepository.save(notification);
         return new NotificationDtos.UpdateNotificationResponse(saved.getId(), saved.getActor().getId(),
                 saved.getReceptor().getId(), saved.getContent(), saved.getCreatedAt(), saved.getStatus(),
-                saved.getObjectType());
+                saved.getObjectType(), saved.getObjectId());
     }
 
     private NotificationDtos.NotificationAccount toAccount(Account account) {

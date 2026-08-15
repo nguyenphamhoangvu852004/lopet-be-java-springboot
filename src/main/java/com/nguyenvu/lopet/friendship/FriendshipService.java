@@ -12,6 +12,7 @@ import com.nguyenvu.lopet.friendship.dto.FriendshipDtos;
 import com.nguyenvu.lopet.friendship.entity.Friendship;
 import com.nguyenvu.lopet.friendship.entity.FriendshipStatus;
 import com.nguyenvu.lopet.friendship.repository.FriendshipRepository;
+import com.nguyenvu.lopet.notification.NotificationPublisher;
 
 import lombok.RequiredArgsConstructor;
 
@@ -21,6 +22,7 @@ public class FriendshipService {
 
     private final FriendshipRepository friendshipRepository;
     private final AccountRepository accountRepository;
+    private final NotificationPublisher notificationPublisher;
 
     /** Lời mời PENDING mà người gọi ĐÃ GỬI đi */
     @Transactional(readOnly = true)
@@ -76,6 +78,8 @@ public class FriendshipService {
                 .status(FriendshipStatus.PENDING)
                 .build());
 
+        notificationPublisher.friendRequested(sender.getId(), receiver.getId());
+
         return new FriendshipDtos.CreateFriendshipResponse(saved.getId(), sender.getId(), receiver.getId(),
                 saved.getCreatedAt());
     }
@@ -94,6 +98,12 @@ public class FriendshipService {
                 .orElseThrow(BadRequestException::new);
         friendship.setStatus(status);
         Friendship saved = friendshipRepository.save(friendship);
+
+        // Chỉ báo khi lời mời được CHẤP NHẬN. Từ chối thì im lặng: người bị từ chối không cần một
+        // dòng thông báo nhắc lại chuyện đó, và bản TS cũng chưa bao giờ gửi.
+        if (status == FriendshipStatus.ACCEPTED) {
+            notificationPublisher.friendAccepted(receiverId, senderId);
+        }
 
         return new FriendshipDtos.ChangeStatusResponse(saved.getSender().getId(),
                 saved.getReceiver().getId(), saved.getStatus());

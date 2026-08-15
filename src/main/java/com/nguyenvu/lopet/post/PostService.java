@@ -19,6 +19,7 @@ import com.nguyenvu.lopet.post.entity.MediaType;
 import com.nguyenvu.lopet.post.entity.Post;
 import com.nguyenvu.lopet.post.entity.PostLike;
 import com.nguyenvu.lopet.post.entity.PostMedia;
+import com.nguyenvu.lopet.notification.NotificationPublisher;
 import com.nguyenvu.lopet.post.repository.PostLikeRepository;
 import com.nguyenvu.lopet.post.repository.PostMediaRepository;
 import com.nguyenvu.lopet.post.repository.PostRepository;
@@ -40,6 +41,7 @@ public class PostService {
     private final PostRepository postRepository;
     private final PostMediaRepository postMediaRepository;
     private final PostLikeRepository postLikeRepository;
+    private final NotificationPublisher notificationPublisher;
     private final AccountRepository accountRepository;
     private final PostPolicy postPolicy;
 
@@ -192,6 +194,11 @@ public class PostService {
         }
 
         postLikeRepository.save(PostLike.builder().post(post).account(account).build());
+
+        // Sau nhánh idempotent phía trên: thích lại bài đã thích không sinh thêm thông báo nào.
+        // Bỏ thích rồi thích lại thì có — đó là một lượt thích mới thật sự.
+        notificationPublisher.postLiked(accountId, post.getAccount().getId(), post.getId());
+
         return new PostDtos.ReactResponse("Like post successfully");
     }
 

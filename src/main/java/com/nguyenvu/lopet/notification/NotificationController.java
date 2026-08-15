@@ -39,8 +39,9 @@ public class NotificationController {
 
         realtimeGateway.emit(RealtimeGateway.userRoom(response.receptorId()),
                 RealtimeGateway.EVENT_NOTIFICATION,
-                new NotificationDtos.NotificationEvent(response.actorId(), response.receptorId(),
-                        response.content(), response.objectType(), response.status(), response.createdAt()));
+                new NotificationDtos.NotificationEvent(response.notificationId(), response.actorId(),
+                        response.receptorId(), response.content(), response.objectType(),
+                        response.objectId(), response.status(), response.createdAt()));
 
         return ApiResponse.created("Create notification successfully", response);
     }

@@ -89,6 +89,20 @@ public class MessageController {
                 new MessageDtos.MarkStatusResponse(result.count(), MessageStatus.READ));
     }
 
+    /**
+     * Danh sách id tin đang chờ ack "đã nhận" — client gọi ngay sau khi socket kết nối, rồi ack lại
+     * bằng chính hai đường có sẵn ({@code message delivered} hoặc {@code PATCH /delivered}).
+     *
+     * <p>Không có bước này, tin gửi lúc người nhận đã đăng xuất sẽ kẹt ở "đã gửi" mãi mãi: không
+     * socket nào chuyển chúng đi nên chẳng có ack nào được phát, kể cả sau khi họ đăng nhập lại.
+     */
+    @GetMapping("/pending-delivery")
+    @Auth
+    public ApiResponse<List<Integer>> pendingDelivery() {
+        return ApiResponse.ok("Get pending delivery messages successfully",
+                messageService.awaitingDelivery(CurrentUser.require().id()));
+    }
+
     /** Badge tổng số tin chưa đọc của người gọi */
     @GetMapping("/unread-count")
     @Auth

@@ -25,16 +25,27 @@ public final class NotificationDtos {
             Integer receptorId,
             String content,
             NotificationObjectType objectType,
+            Integer objectId,
             NotificationStatus status,
             LocalDateTime createdAt) {
     }
 
-    /** Payload socket của sự kiện {@code notification} — không có notificationId */
+    /**
+     * Payload socket của sự kiện {@code notification}.
+     *
+     * <p>{@code notificationId} nay CÓ mặt (trước đây không). Thiếu nó, giao diện phải coi thông báo
+     * đến qua socket là thứ hạng hai — hiện ra được nhưng không đánh dấu đã đọc được, phải chờ tải
+     * lại từ REST mới có khoá để thao tác.
+     *
+     * <p>{@code objectId} là thứ khiến thông báo bấm được — xem {@link NotificationObjectType}.
+     */
     public record NotificationEvent(
+            Integer notificationId,
             Integer actorId,
             Integer receptorId,
             String content,
             NotificationObjectType objectType,
+            Integer objectId,
             NotificationStatus status,
             LocalDateTime createdAt) {
     }
@@ -46,7 +57,8 @@ public final class NotificationDtos {
             String content,
             LocalDateTime createdAt,
             NotificationStatus status,
-            NotificationObjectType type) {
+            NotificationObjectType type,
+            Integer objectId) {
     }
 
     public record UpdateNotificationRequest(String status) {
@@ -59,7 +71,8 @@ public final class NotificationDtos {
             String content,
             LocalDateTime createdAt,
             NotificationStatus status,
-            NotificationObjectType type) {
+            NotificationObjectType type,
+            Integer objectId) {
     }
 
     /** {@code updatedAt}/{@code deletedAt} vắng mặt khi null — bản TS gán {@code ?? undefined} */
@@ -70,6 +83,7 @@ public final class NotificationDtos {
             String content,
             NotificationStatus status,
             NotificationObjectType type,
+            Integer objectId,
             LocalDateTime createdAt,
             @JsonInclude(JsonInclude.Include.NON_NULL) LocalDateTime updatedAt,
             @JsonInclude(JsonInclude.Include.NON_NULL) LocalDateTime deletedAt) {
