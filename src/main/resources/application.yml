@@ -96,3 +96,9 @@ logging:
   level:
     root: ${LOG_LEVEL}
     com.nguyenvu.lopet: ${LOG_LEVEL}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
