@@ -38,19 +38,21 @@ class SocketIoJsonSupportTest {
     @Test
     void su_kien_notification_serialize_duoc_va_dung_dinh_dang_ngay_cua_REST() throws Exception {
         NotificationDtos.NotificationEvent event = new NotificationDtos.NotificationEvent(
-                2, 1, "nphvudev đã bình luận bài viết của bạn",
-                NotificationObjectType.POST, NotificationStatus.SENT, CREATED_AT);
+                9, 2, 1, "nphvudev đã bình luận bài viết của bạn",
+                NotificationObjectType.POST, 5, NotificationStatus.SENT, CREATED_AT);
 
         assertThat(serialize(List.of("notification", event)))
                 .contains("\"createdAt\":\"" + JacksonConfig.nodeIso(CREATED_AT) + "\"")
-                .contains("\"objectType\":\"POST\"");
+                .contains("\"objectType\":\"POST\"")
+                .contains("\"notificationId\":9")
+                .contains("\"objectId\":5");
     }
 
     @Test
     void su_kien_change_status_cung_mang_LocalDateTime() throws Exception {
         NotificationDtos.UpdateNotificationResponse response =
                 new NotificationDtos.UpdateNotificationResponse(7, 2, 1, "nội dung", CREATED_AT,
-                        NotificationStatus.READ, NotificationObjectType.POST);
+                        NotificationStatus.READ, NotificationObjectType.POST, 5);
 
         assertThat(serialize(List.of("change status", response)))
                 .contains("\"createdAt\":\"" + JacksonConfig.nodeIso(CREATED_AT) + "\"");

@@ -11,7 +11,10 @@ COPY src ./src
 
 # Bỏ test khi đóng gói: test tích hợp cần MySQL/Redis của docker-compose, thứ không tồn tại trên
 # máy build của Render. Test chạy ở CI/máy dev, không phải ở bước build image.
-RUN mvn -B -DskipTests package
+#
+# `maven.test.skip` chứ không phải `skipTests`: `skipTests` chỉ bỏ CHẠY test, vẫn biên dịch
+# src/test — một test lệch chữ ký DTO là đủ làm hỏng cả lần deploy dù mã chạy thật không đụng tới.
+RUN mvn -B -Dmaven.test.skip=true package
 
 # ---------- Stage 2: runtime ----------
 # JRE full của Temurin: ảnh nặng hơn bản jlink nhưng không phải liệt kê tay module nào cả, nên
