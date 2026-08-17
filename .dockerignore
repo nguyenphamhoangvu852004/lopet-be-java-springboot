@@ -18,9 +18,9 @@ target/
 *.ipr
 
 # Dockerfile gọi `mvn` của ảnh maven, không dùng wrapper.
-mvnw
-mvnw.cmd
-.mvn/
+#mvnw
+#mvnw.cmd
+#.mvn/
 
 docs/
 scripts/
