@@ -81,13 +81,16 @@ public class PetController {
                 petService.update(petId, CurrentUser.require().id(), request));
     }
 
-    /** Xoá mềm: hồ sơ chuyển sang ARCHIVED và biến mất khỏi mọi luồng đọc, không xoá cứng */
+    /**
+     * Xoá MỀM: con vật và hồ sơ công khai của nó cùng chuyển sang DEACTIVATED và biến mất khỏi mọi
+     * luồng đọc. Không xoá cứng — bài viết, bình luận của người khác vẫn trỏ tới {@code pets.id}.
+     */
     @DeleteMapping("/{petId}")
     @Auth
     @RequirePermission("pet:delete:own")
-    public ApiResponse<PetDtos.ArchivePetResponse> archive(@PathVariable Integer petId) {
-        petAccessGuard.requireOwnerToArchive(petId);
-        return ApiResponse.ok("Archive pet successfully",
-                petService.archive(petId, CurrentUser.require().id()));
+    public ApiResponse<PetDtos.DeactivatePetResponse> deactivate(@PathVariable Integer petId) {
+        petAccessGuard.requireOwnerToDeactivate(petId);
+        return ApiResponse.ok("Deactivate pet successfully",
+                petService.deactivate(petId, CurrentUser.require().id()));
     }
 }

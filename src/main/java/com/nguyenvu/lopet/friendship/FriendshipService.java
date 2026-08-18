@@ -149,7 +149,7 @@ public class FriendshipService {
     }
 
     private FriendshipDtos.Person person(Account account, FriendshipStatus status) {
-        String avatarUrl = account.getProfile() == null ? "" : account.getProfile().getAvatarUrl();
+        String avatarUrl = account.getAccountProfile() == null ? "" : account.getAccountProfile().getAvatarUrl();
         return new FriendshipDtos.Person(account.getId(), account.getUsername(),
                 avatarUrl == null ? "" : avatarUrl, status);
     }

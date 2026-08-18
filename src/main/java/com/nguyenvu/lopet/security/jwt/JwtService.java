@@ -71,6 +71,16 @@ public class JwtService {
         return parse(token, accessSecret);
     }
 
+    /**
+     * Giải mã refresh token. Khóa ký khác access token nên một access token còn hạn KHÔNG dùng được
+     * ở {@code POST /v1/auth/refresh}, và ngược lại refresh token không qua được
+     * {@link com.nguyenvu.lopet.security.jwt.JwtAuthenticationFilter} để gọi API thường — đó là
+     * toàn bộ phần tách bạch giữa hai loại token ở bản không lưu trạng thái này.
+     */
+    public UserPrincipal parseRefreshToken(String token) {
+        return parse(token, refreshSecret);
+    }
+
     private String sign(UserPrincipal payload, byte[] secret, long ttlSeconds) {
         long issuedAt = Instant.now().getEpochSecond();
 

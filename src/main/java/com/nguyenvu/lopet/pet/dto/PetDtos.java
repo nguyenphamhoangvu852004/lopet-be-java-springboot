@@ -4,10 +4,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import com.nguyenvu.lopet.pet.entity.PetGender;
-import com.nguyenvu.lopet.pet.entity.PetOwnershipType;
 import com.nguyenvu.lopet.pet.entity.PetSpecies;
 import com.nguyenvu.lopet.pet.entity.PetStatus;
-import com.nguyenvu.lopet.pet.entity.PetVisibility;
+import com.nguyenvu.lopet.petprofile.entity.PetVisibility;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -51,17 +50,21 @@ public final class PetDtos {
             @PastOrPresent(message = "\"dateOfBirth\" must be less than or equal to today")
             LocalDate dateOfBirth,
 
-            @Size(max = 500, message = "\"bio\" length must be less than or equal to 500 characters long")
-            String bio,
-
-            /** Bỏ trống thì mặc định PUBLIC */
+            /**
+             * Phạm vi riêng tư của HỒ SƠ CÔNG KHAI, không phải của con vật. Nhận ở đây vì hồ sơ được
+             * tạo kèm trong cùng transaction nên người dùng phải chọn được ngay lúc tạo; sau đó nó
+             * chỉ đổi qua {@code PUT /v1/pet-profiles/{petId}}. Bỏ trống thì mặc định PUBLIC.
+             */
             String visibility) {
     }
 
     /**
-     * Cùng bộ trường với create, KHÔNG có {@code status}/{@code deletedAt}/{@code createdAt}/
-     * {@code updatedAt} và cũng không có bất kỳ trường sở hữu nào: chuyển quyền sở hữu là một use
-     * case riêng, không phải hệ quả phụ của việc sửa tên thú cưng.
+     * Cùng bộ trường với create trừ {@code visibility}, KHÔNG có {@code status}/{@code deletedAt}/
+     * {@code createdAt}/{@code updatedAt} và cũng không có bất kỳ trường sở hữu nào: chuyển quyền sở
+     * hữu là một use case riêng, không phải hệ quả phụ của việc sửa tên thú cưng.
+     *
+     * <p>{@code bio} và {@code visibility} vắng mặt vì chúng đã chuyển sang hồ sơ công khai — sửa
+     * chúng ở đây và ở {@code PUT /v1/pet-profiles/{petId}} sẽ là hai đường ghi vào cùng một cột.
      */
     public record UpdatePetRequest(
 
@@ -83,15 +86,19 @@ public final class PetDtos {
 
             @NotNull(message = "\"dateOfBirth\" is required")
             @PastOrPresent(message = "\"dateOfBirth\" must be less than or equal to today")
-            LocalDate dateOfBirth,
-
-            @Size(max = 500, message = "\"bio\" length must be less than or equal to 500 characters long")
-            String bio,
-
-            String visibility) {
+            LocalDate dateOfBirth) {
     }
 
-    /** Chi tiết một hồ sơ — kèm chủ sở hữu chính để client biết ai được phép xoá */
+    /** Phần hồ sơ công khai nhúng trong mọi response của module pet */
+    public record PetProfileSummary(
+            String handle,
+            String displayName,
+            String avatarUrl,
+            String bio,
+            PetVisibility visibility) {
+    }
+
+    /** Chi tiết một con vật — kèm chủ sở hữu để client biết ai được phép sửa/ngừng hoạt động */
     public record PetDetail(
             Integer petId,
             String name,
@@ -99,15 +106,17 @@ public final class PetDtos {
             String breed,
             PetGender gender,
             LocalDate dateOfBirth,
-            String bio,
             PetStatus status,
-            PetVisibility visibility,
-            Integer primaryOwnerId,
+            Integer ownerAccountId,
+            PetProfileSummary profile,
             LocalDateTime createdAt,
             LocalDateTime updatedAt) {
     }
 
-    /** Phần tử của "thú cưng của tôi" — {@code myOwnershipType} là vai trò của chính người gọi */
+    /**
+     * Phần tử của "thú cưng của tôi". Không có {@code ownerAccountId}: danh sách này luôn là của
+     * chính người gọi, lặp lại id của họ trên mỗi phần tử không nói thêm điều gì.
+     */
     public record PetListItem(
             Integer petId,
             String name,
@@ -116,14 +125,13 @@ public final class PetDtos {
             PetGender gender,
             LocalDate dateOfBirth,
             PetStatus status,
-            PetVisibility visibility,
-            PetOwnershipType myOwnershipType,
+            PetProfileSummary profile,
             LocalDateTime createdAt,
             LocalDateTime updatedAt) {
     }
 
-    /** Trả về trạng thái sau khi lưu trữ để client không phải đoán */
-    public record ArchivePetResponse(Integer petId, PetStatus status) {
+    /** Trả về trạng thái sau khi ngừng hoạt động để client không phải đoán */
+    public record DeactivatePetResponse(Integer petId, PetStatus status) {
     }
 
     private PetDtos() {

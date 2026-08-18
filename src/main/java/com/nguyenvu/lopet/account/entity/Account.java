@@ -7,8 +7,9 @@ import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.annotations.SQLRestriction;
 
+import com.nguyenvu.lopet.accountprofile.entity.AccountProfile;
 import com.nguyenvu.lopet.common.entity.BaseEntity;
-import com.nguyenvu.lopet.profile.entity.Profile;
+import com.nguyenvu.lopet.pet.entity.Pet;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -60,11 +61,25 @@ public class Account extends BaseEntity {
     @Column(name = "isBanned", columnDefinition = "tinyint not null default 0")
     private Integer isBanned = 0;
 
-    /** FK nằm ở phía accounts (accounts.profileId) đúng như {@code @JoinColumn} của TypeORM */
+    /**
+     * FK vẫn nằm ở phía accounts, nhưng cột đổi tên cùng lúc với bảng đích
+     * ({@code profiles} -> {@code account_profiles}): tên cũ {@code profileId} giờ mơ hồ vì hệ thống
+     * có hai loại hồ sơ — hồ sơ chủ (bảng này) và hồ sơ thú cưng ({@code pet_profiles}).
+     */
     @OneToOne(fetch = FetchType.LAZY, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
-    @JoinColumn(name = "profileId")
+    @JoinColumn(name = "account_profile_id")
     @OnDelete(action = OnDeleteAction.CASCADE)
-    private Profile profile;
+    private AccountProfile accountProfile;
+
+    /**
+     * Account 1:N Pet. Phía nghịch của {@code pets.account_id} — khai ở đây để {@code AccountService}
+     * trả lời được "tài khoản này đã có thú cưng nào chưa" mà không phải inject repository của module
+     * pet. KHÔNG cascade: xoá tài khoản không được kéo theo thú cưng (chúng còn nội dung của người
+     * khác trỏ tới).
+     */
+    @Builder.Default
+    @OneToMany(mappedBy = "account", fetch = FetchType.LAZY)
+    private Set<Pet> pets = new LinkedHashSet<>();
 
     @Builder.Default
     @OneToMany(mappedBy = "account", fetch = FetchType.LAZY)

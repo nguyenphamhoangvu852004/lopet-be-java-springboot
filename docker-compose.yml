@@ -8,6 +8,8 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: ${DATABASE_PASSWORD}
       MYSQL_DATABASE: ${DATABASE_NAME}
+    ports:
+      - 3307:3306
     volumes:
       - lopet-mysql-volume:/var/lib/mysql
     networks:
@@ -18,6 +20,8 @@ services:
   redis:
     image: redis:8.0
     container_name: ${REDIS_HOSTNAME}
+    ports:
+      - 6379:6379
     networks:
       - lopet-network
     mem_limit: 100m
@@ -27,8 +31,18 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: backend
+    ports:
+      # Hai cổng, không phải một: Tomcat phục vụ REST ở 8080, còn netty-socketio nghe cổng RIÊNG
+      # (8081) vì Tomcat đã chiếm 8080 — xem lopet.socket.port trong application.yml. Thiếu dòng
+      # thứ hai thì REST chạy bình thường trong khi mọi kết nối socket của frontend bị từ chối, một
+      # kiểu hỏng chỉ lộ ra ở tính năng realtime.
+      #
+      # Bản deploy sau nginx gộp cả hai về một origin và chỉ publish một cổng; compose này KHÔNG
+      # chạy nginx (Dockerfile vào thẳng `java -jar`), nên phải mở đúng cổng mà client gọi tới.
+      - 8080:8080
+      - 8081:8081
     env_file:
-      - .env.prod
+      - .env.dev
     networks:
       - lopet-network
 
@@ -37,31 +51,8 @@ services:
     depends_on:
       - mysql
       - redis
-  nginx:
-    image: nginx:1.27-alpine
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/conf.d:/etc/nginx/conf.d
-      - certbot-etc:/etc/letsencrypt
-      - certbot-www:/var/www/certbot
-    depends_on:
-      - backend
-    networks:
-      - lopet-network
-    restart: unless-stopped
-
-  certbot:
-    image: certbot/certbot
-    volumes:
-      - certbot-etc:/etc/letsencrypt
-      - certbot-www:/var/www/certbot
-
 volumes:
   lopet-mysql-volume:
-  certbot-etc:
-  certbot-www:
 
 
 

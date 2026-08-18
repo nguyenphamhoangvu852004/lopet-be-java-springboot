@@ -208,6 +208,7 @@ Controller → *AccessGuard → Service → Repository
 | `POST /v1/auth/signup` | **Không cần token.** Bắt buộc có cờ Redis `email_verified:<email>` (`AuthService.java:68`). Cờ bị `deleteVerifiedFlag` **trước** khi kiểm trùng email/username (`:72`) | Trùng email/username → 409; password≠confirm → 400 |
 | `POST /v1/auth/reset` | **Không cần token.** Tiêu thụ cờ bằng `consumeVerifiedFlag` (GETDEL nguyên tử, `OtpStore.java:67`); thiếu cờ → `ForbiddenException` 403 (`AuthService.java:109`) | Ghi `passwordEncoder.encode(...)` vào `accounts.password` |
 | `POST /v1/auth/verify` | **Không cần token.** Nhận `{email, password}`, trả `{isValid:true}` nếu đúng mật khẩu | `AuthService.java:122-130`. Xem §18 `SEC-4` |
+| `POST /v1/auth/refresh` | **Không cần token.** Nhận `{refreshToken}` trong body; đọc lại tài khoản từ DB, chặn tài khoản bị khoá, trả cặp token mới | `AuthService.refresh`. Xem §3.6 |
 
 **Logout:** `Not used in current implementation.` `SecurityConfig.java:34` gọi `logout(logout -> logout.disable())`; không có endpoint logout, không có blacklist token.
 
@@ -298,9 +299,21 @@ trên route `@Auth(required=true)` chuỗi này lọt thẳng ra response body:
 
 ### 3.6 Refresh token
 
-`AuthService.java:59` sinh refresh token và trả về client. **Không có endpoint nào nhận lại nó.**
-`JwtService` chỉ phơi ra `parseAccessToken()` (`:70`) — **không có `parseRefreshToken()`**. Kết quả:
-refresh token hiện là dữ liệu chết. Xem §18 `SEC-5`.
+`POST /v1/auth/refresh` (`AuthController.refresh`) nhận `{refreshToken}` và trả về **cặp token
+mới** `{id, accessToken, refreshToken}` — endpoint MỚI, bản TypeScript không có.
+
+| Điểm | Hành vi | Vì sao |
+|---|---|---|
+| Khoá ký | `JwtService.parseRefreshToken()` dùng `refreshSecret` | Access token không dùng thay refresh token được, và ngược lại |
+| Nguồn roles | Đọc lại `accounts` + `account_role` từ DB | Ký lại payload cũ thì thu quyền phải chờ hết hạn refresh token (10h) mới có hiệu lực |
+| Tài khoản bị khoá | 401 (login là 400) | Client cần một mã khiến interceptor xoá phiên; đây cũng là cơ chế **thu hồi** duy nhất hiện có |
+| Refresh token trả về | Luôn là token MỚI (xoay vòng) | Phiên trượt theo hoạt động thay vì bị cắt cứng sau 10h |
+| Xác thực | Không mang `@Auth` | Người gọi tới đây chính vì access token của họ đã chết |
+
+**Còn thiếu:** không lưu trạng thái, nên refresh token cũ vẫn dùng được tới khi hết hạn (không phát
+hiện được tái sử dụng), và access token đã phát ra không thu hồi được trước hạn. Xem §18 `SEC-5`.
+
+Test: `AuthServiceRefreshTest` (nghiệp vụ), `AuthControllerRefreshTest` (định tuyến + validate).
 
 ---
 
@@ -493,6 +506,7 @@ Ký hiệu: `req` = `@Auth` (mặc định `required=true`) · `opt` = `@Auth(re
 | `/v1/auth/login`, `/v1/password/login` | POST | — | — | — | `AuthController.java:36` |
 | `/v1/auth/signup`, `/v1/password/signup` | POST | — | — | cờ Redis `email_verified` | `:41` |
 | `/v1/auth/verify`, `/v1/password/verify` | POST | — | — | so mật khẩu | `:47` |
+| `/v1/auth/refresh`, `/v1/password/refresh` | POST | — | — | chữ ký refresh token + `isBanned` | `AuthController.refresh` |
 | `/v1/auth/reset`, `/v1/password/reset` | POST | — | — | `consumeVerifiedFlag` | `:52` |
 | `/v1/emails` | POST | — | — | chống spam: còn OTP thì từ chối | `EmailController.java:25` |
 | `/v1/emails/verify` | POST | — | — | so OTP | `:31` |

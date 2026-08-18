@@ -3,6 +3,8 @@ package com.nguyenvu.lopet.post;
 import java.util.Comparator;
 import java.util.List;
 
+import com.nguyenvu.lopet.pet.entity.Pet;
+import com.nguyenvu.lopet.petprofile.entity.PetProfile;
 import com.nguyenvu.lopet.post.dto.PostDtos;
 import com.nguyenvu.lopet.post.entity.Post;
 import com.nguyenvu.lopet.post.entity.PostLike;
@@ -14,13 +16,13 @@ public final class PostMapper {
     public static PostDtos.PostListItem toListItem(Post post) {
         return new PostDtos.PostListItem(
                 post.getId(),
-                post.getAccount().getId(),
+                petIdOf(post),
                 post.getContent(),
                 post.getGroup() == null ? null : post.getGroup().getId(),
                 post.getPostType(),
                 mediasWithId(post),
                 post.getPostLikes().size(),
-                likedAccounts(post),
+                likedPets(post),
                 post.getCreatedAt(),
                 post.getUpdatedAt());
     }
@@ -28,7 +30,7 @@ public final class PostMapper {
     public static PostDtos.PostSuggestItem toSuggestItem(Post post) {
         return new PostDtos.PostSuggestItem(
                 post.getId(),
-                post.getAccount().getId(),
+                petIdOf(post),
                 post.getContent(),
                 post.getGroup() == null ? null : post.getGroup().getId(),
                 post.getPostType(),
@@ -41,13 +43,13 @@ public final class PostMapper {
     public static PostDtos.PostDetail toDetail(Post post) {
         return new PostDtos.PostDetail(
                 post.getId(),
-                post.getAccount().getId(),
+                petIdOf(post),
                 post.getContent(),
                 post.getGroup() == null ? null : post.getGroup().getId(),
                 post.getPostType(),
                 mediasWithId(post),
                 post.getPostLikes().size(),
-                likedAccounts(post),
+                likedPets(post),
                 post.getCreatedAt(),
                 post.getUpdatedAt());
     }
@@ -69,6 +71,14 @@ public final class PostMapper {
                 media.getCreatedAt(), media.getUpdatedAt());
     }
 
+    /**
+     * {@code null} khi bài chưa di trú xong ({@code pet_id} còn rỗng). Không ném ở đây: mapper chạy
+     * trên đường đọc, và một hàng dữ liệu cũ không được phép làm hỏng cả trang feed.
+     */
+    private static Integer petIdOf(Post post) {
+        return post.getPet() == null ? null : post.getPet().getId();
+    }
+
     private static List<PostDtos.MediaWithId> mediasWithId(Post post) {
         return sortedMedias(post).map(PostMapper::toMediaWithId).toList();
     }
@@ -85,12 +95,23 @@ public final class PostMapper {
         return post.getPostMedias().stream().sorted(Comparator.comparing(PostMedia::getId));
     }
 
-    private static List<PostDtos.LikedAccount> likedAccounts(Post post) {
+    private static List<PostDtos.LikedPet> likedPets(Post post) {
         return post.getPostLikes().stream()
                 .sorted(Comparator.comparing(PostLike::getId))
-                .map(like -> new PostDtos.LikedAccount(like.getAccount().getId(),
-                        like.getAccount().getUsername(), like.getAccount().getEmail()))
+                .filter(like -> like.getPet() != null)
+                .map(like -> {
+                    Pet pet = like.getPet();
+                    PetProfile profile = pet.getPetProfile();
+                    return new PostDtos.LikedPet(pet.getId(),
+                            profile == null ? "" : profile.getHandle(),
+                            profile == null ? "" : profile.getDisplayName(),
+                            profile == null ? "" : orEmpty(profile.getAvatarUrl()));
+                })
                 .toList();
+    }
+
+    private static String orEmpty(String value) {
+        return value == null ? "" : value;
     }
 
     private PostMapper() {

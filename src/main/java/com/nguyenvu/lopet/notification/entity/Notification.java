@@ -53,7 +53,9 @@ public class Notification extends BaseEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "objectType", nullable = false, columnDefinition = "enum('POST_LIKE','POST_COMMENT',"
-            + "'MESSAGE','FRIEND_REQUEST','FRIEND_ACCEPTED','POST') not null")
+            + "'MESSAGE','FRIEND_REQUEST','FRIEND_ACCEPTED','POST',"
+            + "'GROUP_JOIN_REQUESTED','GROUP_JOIN_APPROVED','GROUP_INVITED',"
+            + "'GROUP_INVITE_ACCEPTED') not null")
     private NotificationObjectType objectType;
 
     /**

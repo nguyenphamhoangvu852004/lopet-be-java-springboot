@@ -16,19 +16,19 @@ public interface AccountRepository extends JpaRepository<Account, Integer> {
      * Bản nạp kèm quan hệ, tương ứng {@code findById} của AccountRepoImpl (relations: profile +
      * accountRoles.role). Hầu hết luồng nghiệp vụ dùng bản này.
      */
-    @EntityGraph(attributePaths = {"profile", "accountRoles", "accountRoles.role"})
+    @EntityGraph(attributePaths = {"accountProfile", "accountRoles", "accountRoles.role"})
     @Query("select a from Account a where a.id = :id")
     Optional<Account> findDetailById(@Param("id") Integer id);
 
-    @EntityGraph(attributePaths = {"profile", "accountRoles", "accountRoles.role"})
+    @EntityGraph(attributePaths = {"accountProfile", "accountRoles", "accountRoles.role"})
     @Query("select a from Account a where a.email = :email")
     Optional<Account> findDetailByEmail(@Param("email") String email);
 
-    @EntityGraph(attributePaths = {"profile", "accountRoles", "accountRoles.role"})
+    @EntityGraph(attributePaths = {"accountProfile", "accountRoles", "accountRoles.role"})
     @Query("select a from Account a where a.username = :username")
     Optional<Account> findDetailByUsername(@Param("username") String username);
 
-    @EntityGraph(attributePaths = {"profile", "accountRoles", "accountRoles.role"})
+    @EntityGraph(attributePaths = {"accountProfile", "accountRoles", "accountRoles.role"})
     @Query("select distinct a from Account a")
     List<Account> findAllDetail();
 

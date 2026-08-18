@@ -10,6 +10,8 @@ import com.nguyenvu.lopet.account.entity.Account;
 import com.nguyenvu.lopet.account.repository.AccountRepository;
 import com.nguyenvu.lopet.auth.dto.LoginRequest;
 import com.nguyenvu.lopet.auth.dto.LoginResponse;
+import com.nguyenvu.lopet.auth.dto.RefreshTokenRequest;
+import com.nguyenvu.lopet.auth.dto.RefreshTokenResponse;
 import com.nguyenvu.lopet.auth.dto.RegisterRequest;
 import com.nguyenvu.lopet.auth.dto.RegisterResponse;
 import com.nguyenvu.lopet.auth.dto.ResetPasswordRequest;
@@ -20,8 +22,10 @@ import com.nguyenvu.lopet.common.exception.BadRequestException;
 import com.nguyenvu.lopet.common.exception.ConflictException;
 import com.nguyenvu.lopet.common.exception.ForbiddenException;
 import com.nguyenvu.lopet.common.exception.NotFoundException;
+import com.nguyenvu.lopet.common.exception.UnauthorizedException;
 import com.nguyenvu.lopet.email.OtpStore;
-import com.nguyenvu.lopet.profile.ProfileFactory;
+import com.nguyenvu.lopet.accountprofile.AccountProfileFactory;
+import com.nguyenvu.lopet.security.jwt.JwtException;
 import com.nguyenvu.lopet.security.jwt.JwtService;
 import com.nguyenvu.lopet.security.jwt.UserPrincipal;
 
@@ -61,6 +65,58 @@ public class AuthService {
     }
 
     /**
+     * Cấp lại cặp token từ refresh token. Đây là đường duy nhất để một phiên sống lâu hơn
+     * {@code ACCESS_TOKEN_EXPIRES_IN} (1 giờ) — trước đó access token hết hạn đồng nghĩa người dùng
+     * bị đá về màn hình đăng nhập giữa chừng.
+     *
+     * <p>Ba điểm cố ý:
+     *
+     * <ul>
+     *   <li><b>Đọc lại tài khoản từ DB thay vì tin claim trong token.</b> Roles được ký vào access
+     *       token, nên nếu chỉ ký lại payload cũ thì một lần thu hồi quyền phải chờ tới khi refresh
+     *       token hết hạn (10 giờ) mới có hiệu lực. Đọc lại DB khiến mỗi lần gia hạn là một lần
+     *       đồng bộ quyền.</li>
+     *   <li><b>Tài khoản bị khoá thì cắt phiên ngay,</b> và trả 401 chứ không phải 400 như
+     *       {@link #login} — 400 chỉ là thông báo cho form đăng nhập, còn ở đây client cần một mã
+     *       khiến interceptor xoá phiên và đưa về trang đăng nhập. Đây cũng là cơ chế thu hồi duy
+     *       nhất hiện có: ban tài khoản chặn được việc gia hạn, dù access token đang lưu hành vẫn
+     *       sống hết phần hạn còn lại của nó.</li>
+     *   <li><b>Xoay vòng refresh token.</b> Không lưu trạng thái nên token cũ vẫn dùng được tới khi
+     *       hết hạn — chưa phải chống tái sử dụng thật sự, nhưng cho phép client hoạt động liên tục
+     *       giữ phiên trượt theo thời gian thay vì bị cắt cứng sau 10 giờ.</li>
+     * </ul>
+     */
+    @Transactional(readOnly = true)
+    public RefreshTokenResponse refresh(RefreshTokenRequest request) {
+        UserPrincipal claims;
+        try {
+            claims = jwtService.parseRefreshToken(request.refreshToken());
+        } catch (JwtException exception) {
+            // Gộp "hết hạn" và "sai chữ ký" về cùng một mã: cả hai đều kết thúc phiên, và phân biệt
+            // ra ngoài chỉ giúp người dò token biết mình đoán đúng khoá hay chưa.
+            throw new UnauthorizedException(exception.isExpired()
+                    ? "Refresh token đã hết hạn"
+                    : "Refresh token không hợp lệ");
+        }
+
+        if (claims.id() == null) {
+            throw new UnauthorizedException("Refresh token không hợp lệ");
+        }
+
+        Account account = accountRepository.findDetailById(claims.id())
+                .orElseThrow(() -> new UnauthorizedException("Refresh token không hợp lệ"));
+
+        if (account.getIsBanned() != null && account.getIsBanned() == 1) {
+            throw new UnauthorizedException("Người dùng " + account.getUsername() + " đã bị khoá");
+        }
+
+        UserPrincipal payload = new UserPrincipal(account.getId(), account.getEmail(), rolesOf(account));
+        return new RefreshTokenResponse(account.getId(),
+                jwtService.generateAccessToken(payload),
+                jwtService.generateRefreshToken(payload));
+    }
+
+    /**
      * Đăng ký bắt buộc đã qua OTP. Cờ được XOÁ ngay trước khi kiểm tra trùng email/username — giữ
      * nguyên thứ tự của bản TS: đăng ký trùng thì cờ đã mất và người dùng phải xin OTP lại.
      */
@@ -90,7 +146,7 @@ public class AuthService {
                 .username(request.username())
                 .password(passwordEncoder.encode(request.password()))
                 .isBanned(0)
-                .profile(ProfileFactory.seedFor(request.username()))
+                .accountProfile(AccountProfileFactory.seedFor(request.username()))
                 .build());
 
         return new RegisterResponse(saved.getId(), saved.getEmail(), saved.getUsername());

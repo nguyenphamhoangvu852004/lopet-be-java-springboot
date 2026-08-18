@@ -13,6 +13,10 @@ package com.nguyenvu.lopet.notification.entity;
  *   <tr><td>{@link #MESSAGE}</td><td>id tin nhắn</td><td>/messages/{actorId}</td></tr>
  *   <tr><td>{@link #FRIEND_REQUEST}</td><td>id người gửi</td><td>/friends</td></tr>
  *   <tr><td>{@link #FRIEND_ACCEPTED}</td><td>id người chấp nhận</td><td>/profile/{actorId}</td></tr>
+ *   <tr><td>{@link #GROUP_JOIN_REQUESTED}</td><td>id nhóm</td><td>/groups/{objectId}/requests</td></tr>
+ *   <tr><td>{@link #GROUP_JOIN_APPROVED}</td><td>id nhóm</td><td>/groups/{objectId}</td></tr>
+ *   <tr><td>{@link #GROUP_INVITED}</td><td>id nhóm</td><td>/groups/{objectId}</td></tr>
+ *   <tr><td>{@link #GROUP_INVITE_ACCEPTED}</td><td>id nhóm</td><td>/groups/{objectId}</td></tr>
  *   <tr><td>{@link #POST}</td><td>không có</td><td>không đi đâu cả</td></tr>
  * </table>
  *
@@ -36,6 +40,24 @@ public enum NotificationObjectType {
 
     /** Ai đó chấp nhận lời mời kết bạn của người nhận */
     FRIEND_ACCEPTED,
+
+    /**
+     * Một thú cưng xin vào nhóm PRIVATE — người nhận là quản trị nhóm (OWNER/ADMIN).
+     *
+     * <p>{@code objectId} là id NHÓM, không phải id pet xin vào: đích đến là hộp thư yêu cầu của
+     * nhóm, và pet nào xin thì đọc từ {@code actorId}. Nhóm PUBLIC không sinh loại này vì vào nhóm
+     * PUBLIC không cần ai duyệt.
+     */
+    GROUP_JOIN_REQUESTED,
+
+    /** Yêu cầu vào nhóm được duyệt — người nhận là chủ của pet đã xin vào */
+    GROUP_JOIN_APPROVED,
+
+    /** Ai đó mời thú cưng của người nhận vào nhóm; chờ chính người nhận trả lời */
+    GROUP_INVITED,
+
+    /** Lời mời vào nhóm được chấp nhận — người nhận là người ĐÃ MỜI */
+    GROUP_INVITE_ACCEPTED,
 
     /**
      * Loại CŨ, chỉ còn tồn tại để đọc dữ liệu sinh ra trước khi có bảng phân loại này.

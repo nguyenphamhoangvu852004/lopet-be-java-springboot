@@ -21,6 +21,9 @@ import com.nguyenvu.lopet.security.Auth;
 import com.nguyenvu.lopet.security.CurrentUser;
 import com.nguyenvu.lopet.security.RequirePermission;
 
+import com.nguyenvu.lopet.security.petcontext.PetContext;
+import com.nguyenvu.lopet.security.petcontext.RequirePet;
+
 import lombok.RequiredArgsConstructor;
 
 @RestController
@@ -36,6 +39,7 @@ public class CommentController {
     @ResponseStatus(HttpStatus.CREATED)
     @Auth
     @RequirePermission("comment:create")
+    @RequirePet
     public ApiResponse<CommentDtos.CreateCommentResponse> create(
             @RequestParam(required = false) String content,
             @RequestParam(required = false) String postId,
@@ -49,6 +53,7 @@ public class CommentController {
     @ResponseStatus(HttpStatus.CREATED)
     @Auth
     @RequirePermission("comment:create")
+    @RequirePet
     public ApiResponse<CommentDtos.CreateCommentResponse> createJson(
             @RequestBody CommentDtos.CreateCommentRequest request) {
         return created(request.content(), request.postId(), request.replyCommentId(), "");
@@ -69,12 +74,13 @@ public class CommentController {
     @Auth(required = false)
     public ApiResponse<CommentDtos.GetCommentsResponse> getAllFromPost(@PathVariable Integer postId) {
         return ApiResponse.ok("Get comment successfully",
-                commentService.getAllFromPost(postId, CurrentUser.viewerId()));
+                commentService.getAllFromPost(postId, CurrentUser.viewerId(), PetContext.optional()));
     }
 
     @DeleteMapping("/{commentId}")
     @Auth
     @RequirePermission({"comment:delete:own", "post:delete"})
+    @RequirePet
     public ApiResponse<CommentDtos.DeleteCommentResponse> delete(@PathVariable Integer commentId) {
         commentAccessGuard.requireOwnerToDelete(commentId);
         return ApiResponse.ok("Deleted comment successfully", commentService.delete(commentId));

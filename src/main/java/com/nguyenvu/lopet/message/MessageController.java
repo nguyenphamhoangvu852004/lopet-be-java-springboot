@@ -24,6 +24,8 @@ import com.nguyenvu.lopet.realtime.RealtimeGateway;
 import com.nguyenvu.lopet.security.Auth;
 import com.nguyenvu.lopet.security.CurrentUser;
 
+import com.nguyenvu.lopet.security.petcontext.RequireAnyPet;
+
 import lombok.RequiredArgsConstructor;
 
 @RestController
@@ -128,6 +130,7 @@ public class MessageController {
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
     @Auth
+    @RequireAnyPet
     public ApiResponse<MessageDtos.CreateMessageResponse> create(
             @RequestParam(required = false) String content,
             @RequestParam String receiverId,
@@ -139,6 +142,7 @@ public class MessageController {
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
     @Auth
+    @RequireAnyPet
     public ApiResponse<MessageDtos.CreateMessageResponse> createJson(
             @RequestBody MessageDtos.CreateMessageRequest request) {
         return send(request.content(), request.receiverId(), "");
