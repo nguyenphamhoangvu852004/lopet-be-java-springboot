@@ -8,14 +8,14 @@ import com.nguyenvu.lopet.account.dto.AccountViews;
 import com.nguyenvu.lopet.account.dto.AccountViews.AccountBrief;
 import com.nguyenvu.lopet.account.dto.AccountViews.AccountRoleView;
 import com.nguyenvu.lopet.account.dto.AccountViews.FriendshipView;
-import com.nguyenvu.lopet.account.dto.AccountViews.ProfileView;
+import com.nguyenvu.lopet.account.dto.AccountViews.AccountProfileView;
 import com.nguyenvu.lopet.account.dto.AccountViews.RoleView;
 import com.nguyenvu.lopet.account.dto.GetAccountResponse;
 import com.nguyenvu.lopet.account.dto.GetAccountResponse.AccountProfileSummary;
 import com.nguyenvu.lopet.account.entity.Account;
 import com.nguyenvu.lopet.account.entity.AccountRole;
 import com.nguyenvu.lopet.friendship.entity.Friendship;
-import com.nguyenvu.lopet.profile.entity.Profile;
+import com.nguyenvu.lopet.accountprofile.entity.AccountProfile;
 import com.nguyenvu.lopet.role.entity.Role;
 
 /** Ánh xạ entity → hình dạng JSON mà lopet-be trả về. Mọi hàm ở đây chịu null an toàn. */
@@ -26,7 +26,7 @@ public final class AccountMapper {
                 .map(accountRole -> accountRole.getRole().getName().name())
                 .toList();
 
-        Profile profile = account.getProfile();
+        AccountProfile profile = account.getAccountProfile();
         AccountProfileSummary summary = profile == null ? null : new AccountProfileSummary(
                 profile.getId(),
                 profile.getFullName(),
@@ -46,11 +46,11 @@ public final class AccountMapper {
                 account.getId(), account.getEmail(), account.getUsername(), account.getIsBanned());
     }
 
-    public static ProfileView toProfileView(Profile profile) {
+    public static AccountProfileView toAccountProfileView(AccountProfile profile) {
         if (profile == null) {
             return null;
         }
-        return new ProfileView(profile.getCreatedAt(), profile.getUpdatedAt(), profile.getDeletedAt(),
+        return new AccountProfileView(profile.getCreatedAt(), profile.getUpdatedAt(), profile.getDeletedAt(),
                 profile.getId(), profile.getFullName(), profile.getPhoneNumber(), profile.getBio(),
                 profile.getSex(), profile.getDateOfBirth(), profile.getHometown(),
                 profile.getAvatarUrl(), profile.getCoverUrl());
@@ -80,7 +80,7 @@ public final class AccountMapper {
     public static AccountViews.AccountDetail toDetail(Account account) {
         return new AccountViews.AccountDetail(account.getCreatedAt(), account.getUpdatedAt(),
                 account.getDeletedAt(), account.getId(), account.getEmail(), account.getUsername(),
-                account.getIsBanned(), toProfileView(account.getProfile()), sortedRoles(account));
+                account.getIsBanned(), toAccountProfileView(account.getAccountProfile()), sortedRoles(account));
     }
 
     public static AccountViews.AccountListItem toListItem(Account account,
@@ -88,7 +88,7 @@ public final class AccountMapper {
                                                           Map<Integer, List<Friendship>> receivedByAccount) {
         return new AccountViews.AccountListItem(account.getCreatedAt(), account.getUpdatedAt(),
                 account.getDeletedAt(), account.getId(), account.getEmail(), account.getUsername(),
-                account.getIsBanned(), toProfileView(account.getProfile()), sortedRoles(account),
+                account.getIsBanned(), toAccountProfileView(account.getAccountProfile()), sortedRoles(account),
                 friendshipViews(sentByAccount.get(account.getId())),
                 friendshipViews(receivedByAccount.get(account.getId())));
     }

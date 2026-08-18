@@ -21,14 +21,24 @@ import com.nguyenvu.lopet.common.media.CloudinaryService;
 import com.nguyenvu.lopet.common.response.ApiResponse;
 import com.nguyenvu.lopet.group.dto.GroupDtos;
 import com.nguyenvu.lopet.security.Auth;
-import com.nguyenvu.lopet.security.CurrentUser;
 import com.nguyenvu.lopet.security.RequirePermission;
+
+import com.nguyenvu.lopet.security.petcontext.PetContext;
+import com.nguyenvu.lopet.security.petcontext.RequirePet;
 
 import lombok.RequiredArgsConstructor;
 
 /**
- * Các route đọc ở đây KHÔNG có xác thực, đúng như bản TS — thông tin nhóm (kể cả nhóm PRIVATE) là
- * công khai; thứ được bảo vệ là BÀI VIẾT trong nhóm, do tầng visibility của post lo.
+ * Các route liệt kê ở đây KHÔNG có xác thực, đúng như bản TS. Nhưng {@code GET /{id}} thì có
+ * {@code @Auth(required = false)}: metadata nhóm vẫn công khai, còn DANH SÁCH THÀNH VIÊN của một nhóm
+ * PRIVATE thì không — nó cần biết người xem là pet nào để quyết định che hay không, xem
+ * {@code GroupService#getById}. Bài viết trong nhóm vẫn do tầng visibility của post lo.
+ *
+ * <p><b>Ba mức phân quyền cho các route ghi.</b> Tự phục vụ (tham gia, rời nhóm, mời, trả lời lời
+ * mời) chỉ cần {@code @Auth @RequirePet} — luật nghiệp vụ thật nằm ở service, và không mã quyền toàn
+ * cục nào diễn tả được "là thành viên của đúng nhóm này". Route của quản trị nhóm dùng lại mã
+ * {@code group:update:own} có sẵn, nên {@code PermissionCatalog} không phải đổi. Xoá nhóm thì thêm
+ * {@code group:delete}.
  *
  * <p>Mỗi endpoint ghi có hai biến thể: một nhận {@code multipart/form-data} (có ảnh) và một nhận
  * JSON (không ảnh). Bên Express cả hai kiểu body đều chạy qua cùng một handler nhờ
@@ -48,9 +58,17 @@ public class GroupController {
         return ApiResponse.ok(" Get group successfully", groupService.getListSuggest());
     }
 
+    /**
+     * {@code @Auth(required = false)} + {@code PetContext.optional()}: khách vãng lai vẫn xem được
+     * metadata, người đã chọn pet thì thấy thêm danh sách thành viên nếu pet đó ở trong nhóm. Không
+     * gắn {@code @RequirePet} — bắt buộc header {@code X-Pet-Id} ở một route đọc công khai sẽ chặn
+     * luôn khách.
+     */
     @GetMapping("/{id}")
+    @Auth(required = false)
     public ApiResponse<GroupDtos.GroupDetail> getById(@PathVariable Integer id) {
-        return ApiResponse.ok("Get group successfully", groupService.getById(id));
+        return ApiResponse.ok("Get group successfully",
+                groupService.getById(id, PetContext.optional()));
     }
 
     @GetMapping("/owned/{id}")
@@ -63,10 +81,20 @@ public class GroupController {
         return ApiResponse.ok(" Get group successfully", groupService.getListJoined(id));
     }
 
+    /**
+     * Nhóm của MỘT thú cưng. Hai route trên nhận id TÀI KHOẢN và gộp mọi thú cưng của người đó —
+     * đúng cho màn hình "nhóm của tôi", nhưng sai cho trang hồ sơ một con vật cụ thể.
+     */
+    @GetMapping("/joined/pets/{id}")
+    public ApiResponse<List<GroupDtos.GroupSummary>> getListJoinedByPet(@PathVariable Integer id) {
+        return ApiResponse.ok(" Get group successfully", groupService.getListJoinedByPet(id));
+    }
+
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
     @Auth
     @RequirePermission("group:create")
+    @RequirePet
     public ApiResponse<GroupDtos.CreateGroupResponse> create(
             @RequestParam(required = false) String name,
             @RequestParam(required = false) String type,
@@ -80,6 +108,7 @@ public class GroupController {
     @ResponseStatus(HttpStatus.CREATED)
     @Auth
     @RequirePermission("group:create")
+    @RequirePet
     public ApiResponse<GroupDtos.CreateGroupResponse> createJson(
             @RequestBody GroupDtos.CreateGroupRequest request) {
         return created(request.name(), request.type(), request.bio(), "");
@@ -88,33 +117,127 @@ public class GroupController {
     private ApiResponse<GroupDtos.CreateGroupResponse> created(String name, String type, String bio,
                                                                 String coverUrl) {
         return ApiResponse.created("Create group successfully",
-                groupService.create(name, type, bio, coverUrl, CurrentUser.require().id()));
+                groupService.create(name, type, bio, coverUrl));
     }
 
+    /* ---------- Tham gia / rời nhóm ---------- */
+
+    /**
+     * Nhóm PUBLIC: vào ngay. Nhóm PRIVATE: tạo yêu cầu chờ quản trị nhóm duyệt. Đọc
+     * {@code status} trong phản hồi để biết đã vào hay đang chờ.
+     */
+    @PostMapping("/{id}/join")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Auth
+    @RequirePet
+    public ApiResponse<GroupDtos.JoinGroupResponse> join(@PathVariable Integer id) {
+        return ApiResponse.created("Join group successfully", groupService.join(id));
+    }
+
+    /** Huỷ yêu cầu tham gia mà chính pet đã gửi và chưa được duyệt */
+    @DeleteMapping("/{id}/join")
+    @Auth
+    @RequirePet
+    public ApiResponse<GroupDtos.LeaveGroupResponse> cancelJoinRequest(@PathVariable Integer id) {
+        return ApiResponse.ok("Cancel join request successfully", groupService.cancelJoinRequest(id));
+    }
+
+    @DeleteMapping("/{id}/leave")
+    @Auth
+    @RequirePet
+    public ApiResponse<GroupDtos.LeaveGroupResponse> leave(@PathVariable Integer id) {
+        return ApiResponse.ok("Leave group successfully", groupService.leave(id));
+    }
+
+    /* ---------- Yêu cầu vào nhóm: quản trị nhóm duyệt ---------- */
+
+    @GetMapping("/{id}/requests")
+    @Auth
+    @RequirePermission("group:update:own")
+    @RequirePet
+    public ApiResponse<List<GroupDtos.PendingMemberView>> getListJoinRequests(@PathVariable Integer id) {
+        return ApiResponse.ok("Get join requests successfully", groupService.listJoinRequests(id));
+    }
+
+    @PostMapping("/requests/approve")
+    @Auth
+    @RequirePermission("group:update:own")
+    @RequirePet
+    public ApiResponse<GroupDtos.JoinGroupResponse> approveJoinRequest(
+            @RequestBody GroupDtos.ReviewMemberRequest request) {
+        return ApiResponse.ok("Approve join request successfully",
+                groupService.reviewJoinRequest(request.groupId(), request.petId(), true));
+    }
+
+    @PostMapping("/requests/reject")
+    @Auth
+    @RequirePermission("group:update:own")
+    @RequirePet
+    public ApiResponse<GroupDtos.JoinGroupResponse> rejectJoinRequest(
+            @RequestBody GroupDtos.ReviewMemberRequest request) {
+        return ApiResponse.ok("Reject join request successfully",
+                groupService.reviewJoinRequest(request.groupId(), request.petId(), false));
+    }
+
+    /* ---------- Lời mời: chính pet được mời duyệt ---------- */
+
+    /**
+     * Mời một thú cưng khác. <b>Không còn là lệnh thêm thành viên thẳng</b> như trước: nó tạo một lời
+     * mời PENDING và người được mời phải tự chấp nhận. Vì vậy quyền cũng nới từ quản trị nhóm xuống
+     * mọi thành viên ACTIVE — một hàng PENDING không cấp quyền đọc gì.
+     */
     @PostMapping("/invites")
     @ResponseStatus(HttpStatus.CREATED)
     @Auth
-    @RequirePermission("group:update:own")
-    public ApiResponse<GroupDtos.AddMemberResponse> addMember(@RequestBody GroupDtos.AddMemberRequest request) {
-        return ApiResponse.created("Add member successfully",
-                groupService.addMember(request.groupId(), request.invitee(), CurrentUser.require().id()));
+    @RequirePet
+    public ApiResponse<GroupDtos.InviteResponse> invite(@RequestBody GroupDtos.AddMemberRequest request) {
+        return ApiResponse.created("Invite member successfully",
+                groupService.invite(request.groupId(), request.invitee()));
+    }
+
+    /** Hộp thư lời mời của pet đang thao tác — không nhận id trong URL, luôn là pet trong header */
+    @GetMapping("/invites/mine")
+    @Auth
+    @RequirePet
+    public ApiResponse<List<GroupDtos.PendingInviteView>> getMyInvites() {
+        return ApiResponse.ok("Get invites successfully", groupService.listMyInvites());
+    }
+
+    @PostMapping("/invites/accept")
+    @Auth
+    @RequirePet
+    public ApiResponse<GroupDtos.JoinGroupResponse> acceptInvite(
+            @RequestBody GroupDtos.GroupIdRequest request) {
+        return ApiResponse.ok("Accept invite successfully",
+                groupService.respondToInvite(request.groupId(), true));
+    }
+
+    @PostMapping("/invites/reject")
+    @Auth
+    @RequirePet
+    public ApiResponse<GroupDtos.JoinGroupResponse> rejectInvite(
+            @RequestBody GroupDtos.GroupIdRequest request) {
+        return ApiResponse.ok("Reject invite successfully",
+                groupService.respondToInvite(request.groupId(), false));
     }
 
     @DeleteMapping
     @Auth
     @RequirePermission({"group:delete:own", "group:delete"})
+    @RequirePet
     public ApiResponse<GroupDtos.DeleteGroupResponse> delete(@RequestBody GroupDtos.DeleteGroupRequest request) {
         return ApiResponse.ok("Delete group successfully",
-                groupService.delete(request.groupId(), CurrentUser.require().id()));
+                groupService.delete(request.groupId()));
     }
 
     @DeleteMapping("/members")
     @Auth
     @RequirePermission("group:update:own")
+    @RequirePet
     public ApiResponse<GroupDtos.RemoveMemberResponse> removeMember(
             @RequestBody GroupDtos.RemoveMemberRequest request) {
         return ApiResponse.ok("Remove member successfully",
-                groupService.removeMember(request.groupId(), request.member(), CurrentUser.require().id()));
+                groupService.removeMember(request.groupId(), request.member()));
     }
 
     /**
@@ -125,6 +248,7 @@ public class GroupController {
     @PutMapping(path = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Auth
     @RequirePermission("group:update:own")
+    @RequirePet
     public ApiResponse<GroupDtos.ModifyGroupResponse> modify(
             @PathVariable Integer id,
             @RequestParam(required = false) String name,
@@ -138,6 +262,7 @@ public class GroupController {
     @PutMapping(path = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE)
     @Auth
     @RequirePermission("group:update:own")
+    @RequirePet
     public ApiResponse<GroupDtos.ModifyGroupResponse> modifyJson(@PathVariable Integer id,
                                                                   @RequestBody GroupDtos.ModifyGroupRequest request) {
         return modified(id, request.name(), request.type(), request.bio(), null);
@@ -147,6 +272,6 @@ public class GroupController {
                                                                  String bio, String coverUrl) {
         String normalizedType = "PUBLIC".equals(type) ? "PUBLIC" : "PRIVATE";
         return ApiResponse.ok("Modify group successfully",
-                groupService.modify(id, name, normalizedType, bio, coverUrl, CurrentUser.require().id()));
+                groupService.modify(id, name, normalizedType, bio, coverUrl));
     }
 }

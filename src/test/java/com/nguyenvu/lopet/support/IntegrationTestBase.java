@@ -32,6 +32,23 @@ public abstract class IntegrationTestBase {
         transactionTemplate.executeWithoutResult(status -> action.run());
     }
 
+    /**
+     * URL Redis với database index RIÊNG cho từng lớp test.
+     *
+     * <p>Bắt buộc phải tách, không phải cho gọn: {@code PetOwnerResolver} cache theo khoá
+     * {@code pet:owner:<petId>}, mà mỗi lớp test có database MySQL riêng nên petId đếm lại từ 1 và
+     * TRÙNG NHAU giữa các lớp. Dùng chung một Redis database thì lớp chạy sau đọc được chủ sở hữu của
+     * pet thuộc lớp chạy trước, và mọi kiểm tra quyền sở hữu pet đỏ theo thứ tự chạy — một loại hỏng
+     * chỉ xuất hiện khi chạy cả bộ, không bao giờ thấy khi chạy lẻ một lớp.
+     *
+     * <p>Index 0 để dành cho ứng dụng dev đang chạy trên cùng Redis: nó cũng cache đúng khoá đó.
+     */
+    public static String redisUrl(int database) {
+        String host = System.getenv().getOrDefault("TEST_REDIS_HOST", "localhost");
+        String port = System.getenv().getOrDefault("TEST_REDIS_PORT", "6379");
+        return "redis://" + host + ":" + port + "/" + database;
+    }
+
     /** URL tới MySQL của docker-compose, tự tạo database nếu chưa có */
     public static String jdbcUrl(String database) {
         String host = System.getenv().getOrDefault("TEST_DB_HOST", "127.0.0.1");

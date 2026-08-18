@@ -71,6 +71,33 @@ public class NotificationPublisher {
         publish(actorId, requesterId, NotificationObjectType.FRIEND_ACCEPTED, actorId);
     }
 
+    /**
+     * Một pet xin vào nhóm PRIVATE. Gọi một lần cho MỖI quản trị nhóm: thông báo là bản ghi
+     * một-người-nhận, không có khái niệm gửi cho một nhóm người.
+     */
+    @Transactional
+    public void groupJoinRequested(Integer actorId, Integer managerAccountId, Integer groupId) {
+        publish(actorId, managerAccountId, NotificationObjectType.GROUP_JOIN_REQUESTED, groupId);
+    }
+
+    /** Yêu cầu vào nhóm được duyệt — người nhận là chủ của pet đã xin vào */
+    @Transactional
+    public void groupJoinApproved(Integer actorId, Integer requesterAccountId, Integer groupId) {
+        publish(actorId, requesterAccountId, NotificationObjectType.GROUP_JOIN_APPROVED, groupId);
+    }
+
+    /** Lời mời vào nhóm — người nhận là chủ của pet được mời */
+    @Transactional
+    public void groupInvited(Integer actorId, Integer inviteeAccountId, Integer groupId) {
+        publish(actorId, inviteeAccountId, NotificationObjectType.GROUP_INVITED, groupId);
+    }
+
+    /** Lời mời vào nhóm được chấp nhận — người nhận là chủ của pet đã mời */
+    @Transactional
+    public void groupInviteAccepted(Integer actorId, Integer inviterAccountId, Integer groupId) {
+        publish(actorId, inviterAccountId, NotificationObjectType.GROUP_INVITE_ACCEPTED, groupId);
+    }
+
     private void publish(Integer actorId, Integer receptorId, NotificationObjectType type,
             Integer objectId) {
         // Tự thích bài mình, tự nhắn cho mình: không ai cần được báo về việc mình vừa làm
@@ -110,6 +137,10 @@ public class NotificationPublisher {
             case MESSAGE -> actor + " đã gửi cho bạn một tin nhắn";
             case FRIEND_REQUEST -> actor + " đã gửi cho bạn lời mời kết bạn";
             case FRIEND_ACCEPTED -> actor + " đã chấp nhận lời mời kết bạn";
+            case GROUP_JOIN_REQUESTED -> actor + " muốn tham gia nhóm của bạn";
+            case GROUP_JOIN_APPROVED -> actor + " đã duyệt yêu cầu tham gia nhóm của bạn";
+            case GROUP_INVITED -> actor + " đã mời bạn tham gia một nhóm";
+            case GROUP_INVITE_ACCEPTED -> actor + " đã chấp nhận lời mời tham gia nhóm";
             // Không sinh mới bao giờ; nhánh này chỉ để switch phủ hết enum
             case POST -> actor + " có một hoạt động mới";
         };

@@ -7,9 +7,9 @@ import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.annotations.SQLRestriction;
 
-import com.nguyenvu.lopet.account.entity.Account;
 import com.nguyenvu.lopet.common.entity.BaseEntity;
 import com.nguyenvu.lopet.group.entity.Group;
+import com.nguyenvu.lopet.pet.entity.Pet;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -44,11 +44,21 @@ public class Post extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    /** Tên trường bên TS là {@code accounts} (số nhiều) dù là quan hệ n-1; cột vẫn là account_id */
+    /**
+     * Tác giả là THÚ CƯNG, không phải tài khoản.
+     *
+     * <p>Trỏ vào {@code pets.id} chứ không phải {@code pet_profiles.id}: hồ sơ công khai đổi được và
+     * khoá được, còn khoá ngoại phải trỏ vào một danh tính bất biến — xem ghi chú ở
+     * {@link com.nguyenvu.lopet.petprofile.entity.PetProfile}.
+     *
+     * <p>Vẫn nullable như cột {@code account_id} cũ: dữ liệu di trú có thể còn bài của tài khoản
+     * chưa từng có thú cưng nào. Mọi luồng GHI lấy tác giả từ {@code PetContext.require()} nên bài
+     * mới luôn có giá trị.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "account_id")
+    @JoinColumn(name = "pet_id")
     @OnDelete(action = OnDeleteAction.CASCADE)
-    private Account account;
+    private Pet pet;
 
     @Column(name = "content", nullable = false, columnDefinition = "text")
     private String content;

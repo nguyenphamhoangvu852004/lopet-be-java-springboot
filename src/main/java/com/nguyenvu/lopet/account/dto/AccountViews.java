@@ -27,7 +27,7 @@ public final class AccountViews {
             Integer isBanned) {
     }
 
-    public record ProfileView(
+    public record AccountProfileView(
             LocalDateTime createdAt,
             LocalDateTime updatedAt,
             LocalDateTime deletedAt,
@@ -84,7 +84,7 @@ public final class AccountViews {
             String email,
             String username,
             Integer isBanned,
-            ProfileView profile,
+            AccountProfileView profile,
             List<AccountRoleView> accountRoles,
             List<FriendshipView> sentFriendRequests,
             List<FriendshipView> receivedFriendRequests) {
@@ -99,7 +99,7 @@ public final class AccountViews {
             String email,
             String username,
             Integer isBanned,
-            ProfileView profile,
+            AccountProfileView profile,
             List<AccountRoleView> accountRoles) {
     }
 

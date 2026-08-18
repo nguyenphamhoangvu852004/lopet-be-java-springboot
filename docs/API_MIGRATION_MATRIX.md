@@ -29,7 +29,8 @@ Cột **AuthZ** ghi tầng phân quyền: `perm:<code>` = `requirePermission`, `
 | 2 | POST | `/v1/auth/signup` | - | Joi `registerValidation` | `{email, username, password, confirmPassword}` | `{id, email, username}` (201) | 400 `Bạn cần xác thực OTP trước khi đăng ký.`; 409 email/username trùng; 400 password≠confirm | DONE |
 | 3 | POST | `/v1/auth/verify` | - | - | `{email, password}` | `{isValid: true}` | 404 `Không tim thấy tài khoản`; 400 `Sai mật khẩu` | DONE |
 | 4 | POST | `/v1/auth/reset` | - | Joi `resetPasswordValidation` | `{email, password, confirmPassword}` | `{id, email, username}` | 400 `Mật khẩu xác nhận không khớp`; 403 `Bạn cần xác thực OTP trước khi đổi mật khẩu.`; 404 | DONE |
-| 1b–4b | POST | `/v1/password/{login,signup,verify,reset}` | | | | | | DONE |
+| 5 | POST | `/v1/auth/refresh` | - | - | `{refreshToken}` | `{id, accessToken, refreshToken}` | 401 `Refresh token đã hết hạn`; 401 `Refresh token không hợp lệ`; 401 `Người dùng <username> đã bị khoá`; 400 Validation error | **MỚI** |
+| 1b–5b | POST | `/v1/password/{login,signup,verify,reset,refresh}` | | | | | | DONE |
 
 **Chi tiết nghiệp vụ**
 
@@ -37,6 +38,10 @@ Cột **AuthZ** ghi tầng phân quyền: `perm:<code>` = `requirePermission`, `
   khai `select:false`), nạp kèm `accountRoles.role`. `roles[]` trong payload JWT = tên các role.
   Response **không** chứa roles — client phải tự decode JWT.
 * Thứ tự kiểm tra login: tồn tại → `isBanned == 1` → so khớp mật khẩu.
+* `refresh` **không có ở bản TypeScript** — bên đó login trả `refreshToken` nhưng không route nào
+  nhận lại, tức access token hết hạn là đăng xuất cứng. Endpoint mới ký lại cả hai token sau khi
+  đọc lại roles từ DB; tài khoản `isBanned == 1` bị chặn ngay tại đây (401, không phải 400 như
+  login) để client biết đường xoá phiên. Chi tiết: `AUTHENTICATION_AUTHORIZATION.md` §3.6.
 * `signup` đòi cờ Redis `email_verified:<email>` (do luồng OTP đặt), **xoá cờ bằng `del` trước khi
   kiểm tra trùng email/username** → nếu trùng thì cờ đã mất, phải xin OTP lại.
 * `reset` tiêu thụ cờ bằng `redis.getDel` (nguyên tử) **trước khi** ghi mật khẩu — fail-closed.
@@ -90,14 +95,28 @@ OTP 6 chữ số, Redis key `otp:<email>` TTL **120s**. Verify xoá `otp:` và �
 | # | Method | Endpoint | Auth | AuthZ | Ghi chú | Java |
 |---|---|---|---|---|---|---|
 | 20 | GET | `/v1/groups/suggest` | - | - | `ORDER BY RAND() LIMIT 10`, kèm members | DONE |
-| 21 | GET | `/v1/groups/:id` | - | - | trả **entity Groups** kèm `members.account` (không lọc riêng tư) | DONE |
+| 21 | GET | `/v1/groups/:id` | opt | lọc riêng tư nhóm | nhóm PRIVATE + người ngoài → `members: []`, `restricted: true`; metadata vẫn công khai. Thêm `totalMembers`, `viewerStatus` | DONE |
 | 22 | GET | `/v1/groups/owned/:id` | - | - | group mà account `:id` có `group_members.role=OWNER` | DONE |
 | 23 | GET | `/v1/groups/joined/:id` | - | - | mọi group account `:id` là thành viên | DONE |
 | 24 | POST | `/v1/groups` | req | `perm:group:create` | multipart `image`; `type` != 'PUBLIC' → PRIVATE; người tạo thành `OWNER` | DONE |
-| 25 | POST | `/v1/groups/invites` | req | `perm:group:update:own` + `svc: canManage` (OWNER/ADMIN) | body `{groupId, invitee}`; 400 nếu đã là thành viên | DONE |
+| 25 | POST | `/v1/groups/invites` | req | `@RequirePet` + `svc: requireActiveMember` | body `{groupId, invitee}`. **Nay tạo LỜI MỜI PENDING**, không thêm thẳng; mọi thành viên ACTIVE mời được; 409 nếu đã có hàng | DONE |
 | 26 | DELETE | `/v1/groups` | req | `perm:group:delete:own|group:delete` + `svc: isOwned` (**đúng OWNER**) | body `{groupId}` | DONE |
 | 27 | DELETE | `/v1/groups/members` | req | `perm:group:update:own` + `svc: canManage` | body `{groupId, member}`; 400 nếu target là OWNER | DONE |
 | 28 | PUT | `/v1/groups/:id` | req | `perm:group:update:own` + `svc: canManage` | multipart `image`. **Defect: `uploadedImage.secure_url` đọc vô điều kiện → thiếu file là 500** | DONE |
+| 28a | GET | `/v1/groups/joined/pets/:id` | - | - | nhóm mà MỘT thú cưng đang tham gia (ACTIVE) | NEW |
+| 28b | POST | `/v1/groups/:id/join` | req | `@RequirePet` | PUBLIC → ACTIVE ngay; PRIVATE → PENDING chờ duyệt. Đang được mời thì coi như chấp nhận. 409 nếu đã là thành viên | NEW |
+| 28c | DELETE | `/v1/groups/:id/join` | req | `@RequirePet` | huỷ yêu cầu do chính pet gửi | NEW |
+| 28d | DELETE | `/v1/groups/:id/leave` | req | `@RequirePet` | 400 nếu là OWNER | NEW |
+| 28e | GET | `/v1/groups/:id/requests` | req | `perm:group:update:own` + `svc: requireManager` | chỉ yêu cầu tự gửi (`invited_by` null), không lẫn lời mời | NEW |
+| 28f | POST | `/v1/groups/requests/approve`\|`/reject` | req | `perm:group:update:own` + `svc: requireManager` | body `{groupId, petId}`; reject = xoá hàng | NEW |
+| 28g | GET | `/v1/groups/invites/mine` | req | `@RequirePet` | hộp thư lời mời của pet đang thao tác | NEW |
+| 28h | POST | `/v1/groups/invites/accept`\|`/reject` | req | `@RequirePet` | body `{groupId}`; chỉ chạm hàng có `invited_by` khác null | NEW |
+
+**Cơ chế vào nhóm** (chi tiết: `docs/GROUP_MANAGEMENT.md`): `group_members` nhận thêm
+`status enum('PENDING','ACTIVE')` và `invited_by`. `PENDING` + `invited_by` NULL = pet tự xin vào nhóm
+PRIVATE, quản trị nhóm duyệt; `PENDING` + `invited_by` khác NULL = được mời, chính pet được mời duyệt.
+Từ chối = xoá hàng. **Mọi truy vấn phân quyền lọc `status = ACTIVE`.**
+
 
 ## 6. Post — `/v1/posts`
 
@@ -121,13 +140,15 @@ B. group_id IS NOT NULL AND postScope = PUBLIC AND group.type=PUBLIC → mọi n
 --- dừng ở đây nếu viewerId undefined/NaN ---
 C. author.id = viewerId                                             → mọi scope
 D. group_id IS NULL AND postScope = FRIEND AND EXISTS(friend_ships ACCEPTED hai chiều)
-E. group_id IS NOT NULL AND EXISTS(group_members có viewerId)       → mọi scope trong nhóm đó
+E. group_id IS NOT NULL AND EXISTS(group_members ACTIVE có viewerPetId) → mọi scope trong nhóm đó
 ```
 
 **Quy tắc ghi (`postPolicy`):** `parseScope(scope, isGroupPost)` — bài cá nhân nhận
 `PUBLIC|FRIEND|PRIVATE`, bài nhóm chỉ `PUBLIC|PRIVATE`; sai → 400. `isGroupPost` luôn suy ra từ
 group **thật đã nạp từ DB**, không từ body. `resolveGroupForPost`: group không tồn tại → 404;
-group PRIVATE mà không phải thành viên → 403; group PUBLIC → ai đăng nhập cũng đăng được.
+**không phải thành viên ACTIVE → 403 Ở CẢ HAI LOẠI NHÓM**. Trước đây nhóm PUBLIC cho ai đăng nhập cũng
+đăng được mà không cần tham gia — đọc/thích/bình luận vẫn mở cho mọi người, chỉ ĐĂNG là hành động của
+thành viên. Hàng PENDING không tính là thành viên.
 
 ## 7. Comment — `/v1/comments`
 

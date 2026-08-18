@@ -9,6 +9,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.nguyenvu.lopet.auth.dto.LoginRequest;
 import com.nguyenvu.lopet.auth.dto.LoginResponse;
+import com.nguyenvu.lopet.auth.dto.RefreshTokenRequest;
+import com.nguyenvu.lopet.auth.dto.RefreshTokenResponse;
 import com.nguyenvu.lopet.auth.dto.RegisterRequest;
 import com.nguyenvu.lopet.auth.dto.RegisterResponse;
 import com.nguyenvu.lopet.auth.dto.ResetPasswordRequest;
@@ -36,6 +38,17 @@ public class AuthController {
     @PostMapping("/login")
     public ApiResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
         return ApiResponse.ok(HttpStatusMessage.OK, authService.login(request));
+    }
+
+    /**
+     * Cố ý KHÔNG mang {@link com.nguyenvu.lopet.security.Auth}: người gọi tới đây chính vì access
+     * token của họ đã hết hạn. Refresh token nằm trong body, không phải header Authorization —
+     * {@link com.nguyenvu.lopet.security.jwt.JwtAuthenticationFilter} vì thế bỏ qua nó, và access
+     * token cũ (dù còn hạn hay không) không ảnh hưởng gì tới kết quả.
+     */
+    @PostMapping("/refresh")
+    public ApiResponse<RefreshTokenResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
+        return ApiResponse.ok(HttpStatusMessage.OK, authService.refresh(request));
     }
 
     @PostMapping("/signup")

@@ -89,20 +89,31 @@ public final class NotificationDtos {
             @JsonInclude(JsonInclude.Include.NON_NULL) LocalDateTime deletedAt) {
     }
 
-    /** Không có {@code roles}: bản TS chỉ gán id/username/email rồi đính thêm profile */
+    /**
+     * Không có {@code roles}: bản TS chỉ gán id/username/email rồi đính thêm profile.
+     *
+     * <p>Actor và receptor vẫn là TÀI KHOẢN, không phải thú cưng — hộp thông báo thuộc về con người
+     * và một người phải nhận đủ thông báo của mọi con vật mình nuôi trong cùng một danh sách. Chỉ
+     * phần {@code profile} nhúng bên trong là chuyển sang hồ sơ thú cưng.
+     */
     public record NotificationAccount(Integer id, String username, String email, NotificationProfile profile) {
     }
 
     /**
-     * Tài khoản chưa có hồ sơ nhận về một object RỖNG ({@code {}}), vì bản TS dựng
+     * Hồ sơ hiển thị, lấy từ {@code pet_profiles} thay vì hồ sơ tài khoản: sau khi nội dung xã hội
+     * do thú cưng tạo ra, một thông báo hiện tên và ảnh của CHỦ sẽ không khớp với bài viết mà nó dẫn
+     * tới. Xem {@code PetProfileRepository.findRepresentativeByAccountId} về cách chọn hồ sơ khi
+     * tài khoản có nhiều thú cưng.
+     *
+     * <p>Tài khoản chưa có thú cưng nào nhận về một object RỖNG ({@code {}}), vì bản TS dựng
      * {@code new GetProfileOutputDTO()} không gán trường nào — do đó tất cả field ở đây đều bị bỏ
      * khi null.
      */
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record NotificationProfile(
             Integer id,
-            String fullName,
-            String phoneNumber,
+            String handle,
+            String displayName,
             String bio,
             String avatarUrl,
             String coverUrl) {

@@ -11,7 +11,7 @@ import com.nguyenvu.lopet.account.AccountService;
 import com.nguyenvu.lopet.account.entity.Account;
 import com.nguyenvu.lopet.account.repository.AccountRepository;
 import com.nguyenvu.lopet.common.exception.BadRequestException;
-import com.nguyenvu.lopet.profile.ProfileFactory;
+import com.nguyenvu.lopet.accountprofile.AccountProfileFactory;
 import com.nguyenvu.lopet.role.entity.RoleName;
 
 import lombok.RequiredArgsConstructor;
@@ -56,7 +56,7 @@ public class AdminInitializer {
                     .username(username)
                     .password(passwordEncoder.encode(password))
                     .isBanned(0)
-                    .profile(ProfileFactory.seedFor(username))
+                    .accountProfile(AccountProfileFactory.seedFor(username))
                     .build());
             log.info("Đã tạo tài khoản admin khởi tạo: {}", email);
         }

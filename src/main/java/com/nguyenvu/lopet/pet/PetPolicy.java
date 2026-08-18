@@ -7,7 +7,6 @@ import java.util.stream.Collectors;
 import com.nguyenvu.lopet.common.exception.BadRequestException;
 import com.nguyenvu.lopet.pet.entity.PetGender;
 import com.nguyenvu.lopet.pet.entity.PetSpecies;
-import com.nguyenvu.lopet.pet.entity.PetVisibility;
 
 /**
  * Chuẩn hoá dữ liệu người dùng gửi lên trước khi nó chạm tới entity — đối xứng với
@@ -24,11 +23,6 @@ public final class PetPolicy {
 
     public static PetGender parseGender(String raw) {
         return parseEnum(PetGender.class, raw, "gender");
-    }
-
-    /** Bỏ trống thì mặc định PUBLIC, đúng như {@code postScope} mặc định của bài viết */
-    public static PetVisibility parseVisibility(String raw) {
-        return blank(raw) ? PetVisibility.PUBLIC : parseEnum(PetVisibility.class, raw, "visibility");
     }
 
     /**
@@ -72,8 +66,12 @@ public final class PetPolicy {
     /**
      * Ném 400 kèm danh sách giá trị hợp lệ thay vì để Jackson ném ra 500. Chuẩn hoá về chữ hoa để
      * {@code "dog"} và {@code "DOG"} là một — client cũ gửi chữ thường không phải là lỗi nghiệp vụ.
+     *
+     * <p>{@code public} vì {@code PetProfilePolicy} dùng lại cho {@code visibility}. Cả hai lớp
+     * policy phải cho ra CÙNG một thông điệp lỗi khi client gửi enum sai, nếu không hai module cùng
+     * nói về một con vật lại trả về hai định dạng lỗi khác nhau.
      */
-    private static <E extends Enum<E>> E parseEnum(Class<E> type, String raw, String field) {
+    public static <E extends Enum<E>> E parseEnum(Class<E> type, String raw, String field) {
         String normalized = raw == null ? null : raw.trim().toUpperCase();
         return Arrays.stream(type.getEnumConstants())
                 .filter(value -> value.name().equals(normalized))

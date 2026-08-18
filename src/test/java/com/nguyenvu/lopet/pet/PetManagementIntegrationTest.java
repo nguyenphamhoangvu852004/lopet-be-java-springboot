@@ -21,15 +21,14 @@ import org.springframework.test.context.DynamicPropertySource;
 import com.nguyenvu.lopet.account.entity.Account;
 import com.nguyenvu.lopet.account.repository.AccountRepository;
 import com.nguyenvu.lopet.common.exception.BadRequestException;
-import com.nguyenvu.lopet.common.exception.ConflictException;
 import com.nguyenvu.lopet.common.exception.ForbiddenException;
 import com.nguyenvu.lopet.common.exception.NotFoundException;
 import com.nguyenvu.lopet.pet.dto.PetDtos;
-import com.nguyenvu.lopet.pet.entity.PetOwnershipType;
 import com.nguyenvu.lopet.pet.entity.PetStatus;
-import com.nguyenvu.lopet.pet.entity.PetVisibility;
-import com.nguyenvu.lopet.pet.repository.PetOwnershipRepository;
 import com.nguyenvu.lopet.pet.repository.PetRepository;
+import com.nguyenvu.lopet.petprofile.entity.PetProfileStatus;
+import com.nguyenvu.lopet.petprofile.entity.PetVisibility;
+import com.nguyenvu.lopet.petprofile.repository.PetProfileRepository;
 import com.nguyenvu.lopet.security.jwt.UserPrincipal;
 import com.nguyenvu.lopet.support.IntegrationTestBase;
 
@@ -37,9 +36,10 @@ import com.nguyenvu.lopet.support.IntegrationTestBase;
  * Pet Core ở tầng SERVICE + guard, trên MySQL thật — cùng khuôn với
  * {@code PostAuthorizationIntegrationTest}.
  *
- * <p>Không mock repository: hai chỗ dễ sai nhất của module này đều nằm trong SQL — mệnh đề lọc
- * quyền xem của {@code PetVisibilityFilter}, và việc {@code @SQLRestriction} có thật sự khiến hồ sơ
- * đã lưu trữ biến mất khỏi MỌI luồng đọc hay không. Mock thì không kiểm được dòng nào trong đó.
+ * <p>Không mock repository: ba chỗ dễ sai nhất của module này đều nằm trong SQL — mệnh đề lọc quyền
+ * xem của {@code PetProfileVisibilityFilter}, việc {@code @SQLRestriction} có thật sự khiến hồ sơ đã
+ * ngừng hoạt động biến mất khỏi MỌI luồng đọc hay không, và bất biến "Pet luôn có PetProfile" chỉ
+ * chứng minh được khi transaction thật sự rollback. Mock thì không kiểm được dòng nào trong đó.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @DisplayName("Pet Management Core")
@@ -58,23 +58,19 @@ class PetManagementIntegrationTest extends IntegrationTestBase {
     @Autowired
     private PetRepository petRepository;
     @Autowired
-    private PetOwnershipRepository petOwnershipRepository;
+    private PetProfileRepository petProfileRepository;
     @Autowired
     private AccountRepository accountRepository;
     @Autowired
     private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
     private Integer owner;
-    private Integer coOwner;
-    private Integer secondCoOwner;
     private Integer stranger;
 
     @BeforeAll
     void seed() {
         inTransaction(() -> {
             owner = account("pet-owner").getId();
-            coOwner = account("pet-coowner").getId();
-            secondCoOwner = account("pet-coowner-2").getId();
             stranger = account("pet-stranger").getId();
         });
     }
@@ -105,12 +101,11 @@ class PetManagementIntegrationTest extends IntegrationTestBase {
 
     private PetDtos.CreatePetRequest request(String name, String visibility) {
         return new PetDtos.CreatePetRequest(name, "DOG", "Golden Retriever", "MALE",
-                LocalDate.of(2023, 3, 12), "Always hungry.", visibility);
+                LocalDate.of(2023, 3, 12), visibility);
     }
 
-    private PetDtos.UpdatePetRequest updateRequest(String name, String visibility) {
-        return new PetDtos.UpdatePetRequest(name, "CAT", "Munchkin", "FEMALE",
-                LocalDate.of(2022, 1, 2), "Sleeps a lot.", visibility);
+    private PetDtos.UpdatePetRequest updateRequest(String name) {
+        return new PetDtos.UpdatePetRequest(name, "CAT", "Munchkin", "FEMALE", LocalDate.of(2022, 1, 2));
     }
 
     private Integer createPet(Integer ownerId, String visibility) {
@@ -118,37 +113,46 @@ class PetManagementIntegrationTest extends IntegrationTestBase {
     }
 
     @Nested
-    @DisplayName("Tạo hồ sơ")
-    class TaoHoSo {
+    @DisplayName("Tạo thú cưng")
+    class TaoThuCung {
 
         @Test
-        @DisplayName("người đã đăng nhập tạo được hồ sơ")
-        void tao_duoc_ho_so() {
+        @DisplayName("người đã đăng nhập tạo được thú cưng")
+        void tao_duoc() {
             PetDtos.PetDetail created = petService.create(owner, request("Milo", null));
 
             assertThat(created.petId()).isPositive();
             assertThat(created.name()).isEqualTo("Milo");
             assertThat(created.status()).isEqualTo(PetStatus.ACTIVE);
-            // Bỏ trống visibility thì mặc định PUBLIC
-            assertThat(created.visibility()).isEqualTo(PetVisibility.PUBLIC);
+            assertThat(created.ownerAccountId()).isEqualTo(owner);
         }
 
         @Test
-        @DisplayName("người tạo tự động thành PRIMARY_OWNER — client không gửi gì cả")
-        void nguoi_tao_thanh_primary_owner() {
+        @DisplayName("chủ sở hữu suy ra từ token — client không gửi ownerId")
+        void chu_so_huu_tu_token() {
             Integer petId = createPet(owner, null);
 
-            List<com.nguyenvu.lopet.pet.entity.PetOwnership> ownerships =
-                    inTransaction(() -> petOwnershipRepository.findAllByPetId(petId));
-
-            assertThat(ownerships).hasSize(1);
-            assertThat(ownerships.get(0).getUserId()).isEqualTo(owner);
-            assertThat(ownerships.get(0).getOwnershipType()).isEqualTo(PetOwnershipType.PRIMARY_OWNER);
+            assertThat(inTransaction(() -> petRepository.findOwnerAccountId(petId)))
+                    .contains(owner);
         }
 
         @Test
-        @DisplayName("hồ sơ và bản ghi sở hữu nằm trong CÙNG một transaction")
-        void tao_ho_so_va_so_huu_la_mot_transaction() {
+        @DisplayName("tạo thú cưng tạo LUÔN hồ sơ công khai kèm theo")
+        void tao_kem_ho_so_cong_khai() {
+            PetDtos.PetDetail created = petService.create(owner, request("Milo", null));
+
+            assertThat(created.profile()).isNotNull();
+            assertThat(created.profile().displayName()).isEqualTo("Milo");
+            // Bỏ trống visibility thì mặc định PUBLIC
+            assertThat(created.profile().visibility()).isEqualTo(PetVisibility.PUBLIC);
+            assertThat(created.profile().handle()).isEqualTo("pet_" + created.petId());
+
+            assertThat(inTransaction(() -> petProfileRepository.findByPetId(created.petId()))).isPresent();
+        }
+
+        @Test
+        @DisplayName("thú cưng và hồ sơ nằm trong CÙNG một transaction")
+        void pet_va_ho_so_la_mot_transaction() {
             Integer[] petId = new Integer[1];
 
             // Rollback ở transaction NGOÀI: nếu create() mở transaction riêng (REQUIRES_NEW) hoặc
@@ -161,14 +165,19 @@ class PetManagementIntegrationTest extends IntegrationTestBase {
 
             assertThat(petId[0]).isNotNull();
             assertThat(inTransaction(() -> petRepository.findById(petId[0]))).isEmpty();
-            assertThat(inTransaction(() -> petOwnershipRepository.findAllByPetId(petId[0]))).isEmpty();
+            assertThat(inTransaction(() -> petProfileRepository.findByPetId(petId[0]))).isEmpty();
         }
 
         @Test
-        @DisplayName("không có hồ sơ nào tồn tại mà thiếu bản ghi sở hữu")
-        void khong_co_ho_so_mo_coi() {
-            Integer petId = createPet(owner, null);
-            assertThat(inTransaction(() -> petOwnershipRepository.findAllByPetId(petId))).isNotEmpty();
+        @DisplayName("không tồn tại thú cưng nào thiếu hồ sơ công khai")
+        void khong_co_pet_thieu_ho_so() {
+            createPet(owner, null);
+
+            Long moCoi = jdbcTemplate.queryForObject("""
+                    select count(*) from pets p
+                    where not exists (select 1 from pet_profiles pp where pp.pet_id = p.id)
+                    """, Long.class);
+            assertThat(moCoi).isZero();
         }
 
         @Test
@@ -183,7 +192,7 @@ class PetManagementIntegrationTest extends IntegrationTestBase {
         @DisplayName("name toàn khoảng trắng bị từ chối ở tầng service")
         void name_rac_bi_tu_choi() {
             assertThatThrownBy(() -> petService.create(owner,
-                    new PetDtos.CreatePetRequest("   ", "DOG", null, "MALE", LocalDate.now(), null, null)))
+                    new PetDtos.CreatePetRequest("   ", "DOG", null, "MALE", LocalDate.now(), null)))
                     .isInstanceOf(BadRequestException.class);
         }
 
@@ -198,7 +207,7 @@ class PetManagementIntegrationTest extends IntegrationTestBase {
         @DisplayName("species lạ trả 400 kèm danh sách hợp lệ, không phải 500")
         void species_la_bi_tu_choi() {
             assertThatThrownBy(() -> petService.create(owner,
-                    new PetDtos.CreatePetRequest("Milo", "DRAGON", null, "MALE", LocalDate.now(), null, null)))
+                    new PetDtos.CreatePetRequest("Milo", "DRAGON", null, "MALE", LocalDate.now(), null)))
                     .isInstanceOf(BadRequestException.class)
                     .hasMessageContaining("species");
         }
@@ -207,7 +216,7 @@ class PetManagementIntegrationTest extends IntegrationTestBase {
         @DisplayName("gender lạ bị từ chối")
         void gender_la_bi_tu_choi() {
             assertThatThrownBy(() -> petService.create(owner,
-                    new PetDtos.CreatePetRequest("Milo", "DOG", null, "ATTACK_HELICOPTER", LocalDate.now(), null, null)))
+                    new PetDtos.CreatePetRequest("Milo", "DOG", null, "ATTACK_HELICOPTER", LocalDate.now(), null)))
                     .isInstanceOf(BadRequestException.class)
                     .hasMessageContaining("gender");
         }
@@ -224,7 +233,7 @@ class PetManagementIntegrationTest extends IntegrationTestBase {
         @DisplayName("species/gender viết thường vẫn nhận")
         void chap_nhan_chu_thuong() {
             PetDtos.PetDetail created = petService.create(owner,
-                    new PetDtos.CreatePetRequest("Milo", "dog", null, "male", LocalDate.now(), null, "public"));
+                    new PetDtos.CreatePetRequest("Milo", "dog", null, "male", LocalDate.now(), "public"));
             assertThat(created.species()).isEqualTo(com.nguyenvu.lopet.pet.entity.PetSpecies.DOG);
         }
 
@@ -233,73 +242,24 @@ class PetManagementIntegrationTest extends IntegrationTestBase {
         void ngay_sinh_tuong_lai_bi_tu_choi() {
             assertThatThrownBy(() -> petService.create(owner,
                     new PetDtos.CreatePetRequest("Milo", "DOG", null, "MALE",
-                            LocalDate.now().plusDays(1), null, null)))
+                            LocalDate.now().plusDays(1), null)))
                     .isInstanceOf(BadRequestException.class)
                     .hasMessageContaining("dateOfBirth");
         }
     }
 
     @Nested
-    @DisplayName("Quy tắc sở hữu")
-    class QuyTacSoHuu {
+    @DisplayName("Đọc và quyền xem")
+    class DocVaQuyenXem {
 
         @Test
-        @DisplayName("một thú cưng nhận được NHIỀU CO_OWNER")
-        void nhieu_co_owner() {
-            Integer petId = createPet(owner, null);
-
-            petService.addOwner(petId, coOwner, PetOwnershipType.CO_OWNER);
-            petService.addOwner(petId, secondCoOwner, PetOwnershipType.CO_OWNER);
-
-            assertThat(inTransaction(() -> petOwnershipRepository.findAllByPetId(petId))).hasSize(3);
-            assertThat(petService.ownerIdsOf(petId)).contains(owner, coOwner, secondCoOwner);
-        }
-
-        @Test
-        @DisplayName("một thú cưng KHÔNG nhận được PRIMARY_OWNER thứ hai")
-        void chi_mot_primary_owner() {
-            Integer petId = createPet(owner, null);
-
-            assertThatThrownBy(() -> petService.addOwner(petId, stranger, PetOwnershipType.PRIMARY_OWNER))
-                    .isInstanceOf(ConflictException.class);
-
-            long primaries = inTransaction(() -> petOwnershipRepository.findAllByPetId(petId)).stream()
-                    .filter(ownership -> ownership.getOwnershipType() == PetOwnershipType.PRIMARY_OWNER)
-                    .count();
-            assertThat(primaries).isEqualTo(1);
-        }
-
-        @Test
-        @DisplayName("cùng một người không giữ hai vai trò trên một thú cưng")
-        void khong_giu_hai_vai_tro() {
-            Integer petId = createPet(owner, null);
-
-            assertThatThrownBy(() -> petService.addOwner(petId, owner, PetOwnershipType.CO_OWNER))
-                    .isInstanceOf(ConflictException.class);
-        }
-
-        @Test
-        @DisplayName("chủ sở hữu xem được hồ sơ của mình ở mọi visibility")
-        void chu_so_huu_xem_duoc_moi_visibility() {
-            for (PetVisibility visibility : PetVisibility.values()) {
-                Integer petId = createPet(owner, visibility.name());
-                assertThat(petService.getOneById(petId, owner)).isNotNull();
-            }
-        }
-    }
-
-    @Nested
-    @DisplayName("Đọc hồ sơ và quyền xem")
-    class DocHoSo {
-
-        @Test
-        @DisplayName("hồ sơ đang tồn tại đọc được")
-        void doc_duoc_ho_so() {
+        @DisplayName("thú cưng đang tồn tại đọc được")
+        void doc_duoc() {
             Integer petId = createPet(owner, PetVisibility.PUBLIC.name());
 
             PetDtos.PetDetail detail = petService.getOneById(petId, owner);
             assertThat(detail.petId()).isEqualTo(petId);
-            assertThat(detail.primaryOwnerId()).isEqualTo(owner);
+            assertThat(detail.ownerAccountId()).isEqualTo(owner);
         }
 
         @Test
@@ -340,66 +300,41 @@ class PetManagementIntegrationTest extends IntegrationTestBase {
         }
 
         @Test
-        @DisplayName("CO_OWNER xem được hồ sơ PRIVATE mình đồng sở hữu")
-        void co_owner_xem_duoc_private() {
-            Integer petId = createPet(owner, PetVisibility.PRIVATE.name());
-            petService.addOwner(petId, coOwner, PetOwnershipType.CO_OWNER);
-
-            assertThat(petService.getOneById(petId, coOwner)).isNotNull();
+        @DisplayName("chủ sở hữu xem được thú cưng của mình ở MỌI visibility")
+        void chu_so_huu_xem_duoc_moi_visibility() {
+            for (PetVisibility visibility : PetVisibility.values()) {
+                Integer petId = createPet(owner, visibility.name());
+                assertThat(petService.getOneById(petId, owner)).isNotNull();
+            }
         }
 
         @Test
-        @DisplayName("danh sách của tôi gồm cả con mình chỉ là CO_OWNER, kèm đúng vai trò")
-        void danh_sach_cua_toi() {
-            Integer mine = createPet(owner, null);
-            Integer shared = createPet(stranger, null);
-            petService.addOwner(shared, owner, PetOwnershipType.CO_OWNER);
-
-            List<PetDtos.PetListItem> pets = petService.getOwnedBy(owner);
-
-            assertThat(pets).anyMatch(pet -> pet.petId().equals(mine)
-                    && pet.myOwnershipType() == PetOwnershipType.PRIMARY_OWNER);
-            assertThat(pets).anyMatch(pet -> pet.petId().equals(shared)
-                    && pet.myOwnershipType() == PetOwnershipType.CO_OWNER);
-        }
-
-        @Test
-        @DisplayName("danh sách của tôi không chứa hồ sơ của người khác")
+        @DisplayName("danh sách của tôi không chứa thú cưng của người khác")
         void danh_sach_khong_lan_cua_nguoi_khac() {
             Integer cuaNguoiLa = createPet(stranger, PetVisibility.PUBLIC.name());
+            Integer cuaToi = createPet(owner, null);
 
-            assertThat(petService.getOwnedBy(owner))
-                    .noneMatch(pet -> pet.petId().equals(cuaNguoiLa));
+            List<PetDtos.PetListItem> pets = petService.getOwnedBy(owner);
+            assertThat(pets).anyMatch(pet -> pet.petId().equals(cuaToi));
+            assertThat(pets).noneMatch(pet -> pet.petId().equals(cuaNguoiLa));
         }
     }
 
     @Nested
-    @DisplayName("Sửa hồ sơ")
-    class SuaHoSo {
+    @DisplayName("Sửa thông tin sinh học")
+    class SuaThongTin {
 
         @Test
         @DisplayName("chủ sở hữu sửa được các trường cho phép")
         void chu_so_huu_sua_duoc() {
             Integer petId = createPet(owner, null);
 
-            PetDtos.PetDetail updated = petService.update(petId, owner,
-                    updateRequest("Milo mới", PetVisibility.PRIVATE.name()));
+            PetDtos.PetDetail updated = petService.update(petId, owner, updateRequest("Milo mới"));
 
             assertThat(updated.name()).isEqualTo("Milo mới");
             assertThat(updated.species()).isEqualTo(com.nguyenvu.lopet.pet.entity.PetSpecies.CAT);
             assertThat(updated.gender()).isEqualTo(com.nguyenvu.lopet.pet.entity.PetGender.FEMALE);
             assertThat(updated.breed()).isEqualTo("Munchkin");
-            assertThat(updated.visibility()).isEqualTo(PetVisibility.PRIVATE);
-        }
-
-        @Test
-        @DisplayName("CO_OWNER cũng sửa được")
-        void co_owner_sua_duoc() {
-            Integer petId = createPet(owner, null);
-            petService.addOwner(petId, coOwner, PetOwnershipType.CO_OWNER);
-
-            assertThat(petService.update(petId, coOwner, updateRequest("Do co-owner sửa", null)).name())
-                    .isEqualTo("Do co-owner sửa");
         }
 
         @Test
@@ -407,21 +342,33 @@ class PetManagementIntegrationTest extends IntegrationTestBase {
         void nguoi_la_khong_sua_duoc() {
             Integer petId = createPet(owner, PetVisibility.PUBLIC.name());
 
-            assertThatThrownBy(() -> petService.update(petId, stranger, updateRequest("cướp", null)))
+            assertThatThrownBy(() -> petService.update(petId, stranger, updateRequest("cướp")))
                     .isInstanceOf(ForbiddenException.class);
         }
 
         @Test
-        @DisplayName("sửa hồ sơ không đụng tới status, người sở hữu chính hay createdAt")
+        @DisplayName("sửa không đụng tới status, chủ sở hữu hay createdAt")
         void sua_khong_dung_truong_domain() {
             Integer petId = createPet(owner, null);
             PetDtos.PetDetail before = petService.getOneById(petId, owner);
 
-            PetDtos.PetDetail after = petService.update(petId, owner, updateRequest("Đổi tên", null));
+            PetDtos.PetDetail after = petService.update(petId, owner, updateRequest("Đổi tên"));
 
             assertThat(after.status()).isEqualTo(PetStatus.ACTIVE);
-            assertThat(after.primaryOwnerId()).isEqualTo(owner);
+            assertThat(after.ownerAccountId()).isEqualTo(owner);
             assertThat(after.createdAt()).isEqualTo(before.createdAt());
+        }
+
+        @Test
+        @DisplayName("sửa thông tin sinh học KHÔNG đổi tên hiển thị của hồ sơ công khai")
+        void sua_khong_dung_ho_so_cong_khai() {
+            PetDtos.PetDetail created = petService.create(owner, request("Milo", null));
+
+            petService.update(created.petId(), owner, updateRequest("Tên khai sinh mới"));
+
+            PetDtos.PetDetail after = petService.getOneById(created.petId(), owner);
+            assertThat(after.name()).isEqualTo("Tên khai sinh mới");
+            assertThat(after.profile().displayName()).isEqualTo("Milo");
         }
 
         @Test
@@ -459,56 +406,56 @@ class PetManagementIntegrationTest extends IntegrationTestBase {
     }
 
     @Nested
-    @DisplayName("Lưu trữ hồ sơ")
-    class LuuTruHoSo {
+    @DisplayName("Ngừng hoạt động")
+    class NgungHoatDong {
 
         @Test
-        @DisplayName("PRIMARY_OWNER lưu trữ được, và đó là xoá MỀM")
-        void primary_owner_luu_tru_duoc() {
+        @DisplayName("chủ sở hữu ngừng được, và đó là xoá MỀM")
+        void chu_so_huu_ngung_duoc() {
             Integer petId = createPet(owner, null);
 
-            PetDtos.ArchivePetResponse response = petService.archive(petId, owner);
-            assertThat(response.status()).isEqualTo(PetStatus.ARCHIVED);
+            PetDtos.DeactivatePetResponse response = petService.deactivate(petId, owner);
+            assertThat(response.status()).isEqualTo(PetStatus.DEACTIVATED);
 
             // Hàng vẫn còn trong bảng — chỉ bị @SQLRestriction che đi, không bị DELETE
-            assertThat(archivedRowCount(petId)).isEqualTo(1L);
+            assertThat(deactivatedRowCount(petId)).isEqualTo(1L);
         }
 
         @Test
-        @DisplayName("người lạ KHÔNG lưu trữ được")
-        void nguoi_la_khong_luu_tru_duoc() {
+        @DisplayName("ngừng thú cưng thì hồ sơ công khai cũng tắt theo")
+        void ho_so_tat_theo() {
+            Integer petId = createPet(owner, PetVisibility.PUBLIC.name());
+            petService.deactivate(petId, owner);
+
+            assertThat(inTransaction(() -> petProfileRepository.findByPetId(petId))).isEmpty();
+            assertThat(deactivatedProfileRowCount(petId)).isEqualTo(1L);
+        }
+
+        @Test
+        @DisplayName("người lạ KHÔNG ngừng được")
+        void nguoi_la_khong_ngung_duoc() {
             Integer petId = createPet(owner, PetVisibility.PUBLIC.name());
 
-            assertThatThrownBy(() -> petService.archive(petId, stranger))
+            assertThatThrownBy(() -> petService.deactivate(petId, stranger))
                     .isInstanceOf(ForbiddenException.class);
             assertThat(inTransaction(() -> petRepository.findById(petId))).isPresent();
         }
 
         @Test
-        @DisplayName("CO_OWNER sửa được nhưng KHÔNG lưu trữ được")
-        void co_owner_khong_luu_tru_duoc() {
-            Integer petId = createPet(owner, null);
-            petService.addOwner(petId, coOwner, PetOwnershipType.CO_OWNER);
-
-            assertThatThrownBy(() -> petService.archive(petId, coOwner))
-                    .isInstanceOf(ForbiddenException.class);
-        }
-
-        @Test
-        @DisplayName("guard chặn người lạ trước khi vào luồng lưu trữ")
-        void guard_chan_luu_tru() {
+        @DisplayName("guard chặn người lạ trước khi vào luồng ngừng hoạt động")
+        void guard_chan_ngung() {
             Integer petId = createPet(owner, PetVisibility.PUBLIC.name());
 
             authenticate(stranger);
-            assertThatThrownBy(() -> petAccessGuard.requireOwnerToArchive(petId))
+            assertThatThrownBy(() -> petAccessGuard.requireOwnerToDeactivate(petId))
                     .isInstanceOf(ForbiddenException.class);
         }
 
         @Test
-        @DisplayName("hồ sơ đã lưu trữ biến mất khỏi MỌI luồng đọc")
-        void da_luu_tru_thi_bien_mat() {
+        @DisplayName("thú cưng đã ngừng biến mất khỏi MỌI luồng đọc")
+        void da_ngung_thi_bien_mat() {
             Integer petId = createPet(owner, PetVisibility.PUBLIC.name());
-            petService.archive(petId, owner);
+            petService.deactivate(petId, owner);
 
             assertThatThrownBy(() -> petService.getOneById(petId, owner))
                     .isInstanceOf(NotFoundException.class);
@@ -519,23 +466,32 @@ class PetManagementIntegrationTest extends IntegrationTestBase {
         }
 
         @Test
-        @DisplayName("hồ sơ đã lưu trữ không sửa được nữa")
-        void da_luu_tru_thi_khong_sua_duoc() {
+        @DisplayName("thú cưng đã ngừng không sửa được nữa")
+        void da_ngung_thi_khong_sua_duoc() {
             Integer petId = createPet(owner, null);
-            petService.archive(petId, owner);
+            petService.deactivate(petId, owner);
 
-            assertThatThrownBy(() -> petService.update(petId, owner, updateRequest("hồi sinh", null)))
+            assertThatThrownBy(() -> petService.update(petId, owner, updateRequest("hồi sinh")))
                     .isInstanceOf(NotFoundException.class);
         }
 
         @Test
-        @DisplayName("lưu trữ hai lần không được — lần hai hồ sơ đã biến mất")
-        void luu_tru_hai_lan() {
+        @DisplayName("ngừng hai lần không được — lần hai đã biến mất")
+        void ngung_hai_lan() {
             Integer petId = createPet(owner, null);
-            petService.archive(petId, owner);
+            petService.deactivate(petId, owner);
 
-            assertThatThrownBy(() -> petService.archive(petId, owner))
+            assertThatThrownBy(() -> petService.deactivate(petId, owner))
                     .isInstanceOf(NotFoundException.class);
+        }
+
+        @Test
+        @DisplayName("pet đã ngừng không còn tra được chủ sở hữu — nền tảng của validate X-Pet-Id")
+        void da_ngung_thi_khong_tra_duoc_chu() {
+            Integer petId = createPet(owner, null);
+            petService.deactivate(petId, owner);
+
+            assertThat(inTransaction(() -> petRepository.findOwnerAccountId(petId))).isEmpty();
         }
     }
 
@@ -543,9 +499,15 @@ class PetManagementIntegrationTest extends IntegrationTestBase {
      * Đếm bằng SQL THÔ: mọi truy vấn qua JPA đều bị {@code @SQLRestriction} lọc mất hàng đã xoá mềm,
      * nên không có cách nào khác để phân biệt "xoá mềm" với "xoá cứng" từ phía test.
      */
-    private Long archivedRowCount(Integer petId) {
+    private Long deactivatedRowCount(Integer petId) {
         return jdbcTemplate.queryForObject(
-                "select count(*) from pets where id = ? and deletedAt is not null and status = 'ARCHIVED'",
-                Long.class, petId);
+                "select count(*) from pets where id = ? and deletedAt is not null and status = ?",
+                Long.class, petId, PetStatus.DEACTIVATED.name());
+    }
+
+    private Long deactivatedProfileRowCount(Integer petId) {
+        return jdbcTemplate.queryForObject(
+                "select count(*) from pet_profiles where pet_id = ? and deletedAt is not null and status = ?",
+                Long.class, petId, PetProfileStatus.DEACTIVATED.name());
     }
 }
