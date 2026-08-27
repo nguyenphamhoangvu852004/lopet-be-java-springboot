@@ -22,10 +22,11 @@ import tools.jackson.databind.module.SimpleModule;
  * đó: LocalDateTime → zone hệ thống → UTC. Mặc định của Jackson là ISO không có offset, tức là
  * client sẽ hiểu sai múi giờ nếu không ghi đè.
  *
- * <p>Customizer này chỉ chạm tới ObjectMapper của Spring (Jackson 3, {@code tools.jackson}).
- * netty-socketio mang theo Jackson 2 riêng của nó và không thấy cấu hình này, nên
- * {@link com.nguyenvu.lopet.realtime.SocketIoConfig} phải cắm lại cùng định dạng — cả hai đường
- * đều đi qua {@link #nodeIso(LocalDateTime)} để không bao giờ lệch nhau.
+ * <p>Customizer này chạm tới ObjectMapper của Spring (Jackson 3, {@code tools.jackson}), và đó là
+ * ObjectMapper duy nhất trong ứng dụng: REST lẫn STOMP over WebSocket đều serialize qua nó, nên
+ * payload realtime không thể lệch định dạng với payload REST. Bản netty-socketio trước đây thì có
+ * thể: nó mang theo Jackson 2 riêng, không thấy cấu hình này, và phải cắm lại cùng định dạng ở một
+ * chỗ thứ hai.
  */
 @Configuration
 public class JacksonConfig {

@@ -12,14 +12,14 @@ import com.nguyenvu.lopet.group.entity.Group;
 public interface GroupRepository extends JpaRepository<Group, Integer> {
 
     /**
-     * Nạp kèm {@code members.pet.petProfile}: danh sách thành viên hiển thị bằng handle/display name
-     * của hồ sơ công khai, và hai cấp quan hệ này đều lazy nên bỏ fetch là N+1 theo số thành viên.
+     * Nạp kèm {@code members.account.accountProfile}: danh sách thành viên hiển thị hồ sơ của từng
+     * người, và hai cấp quan hệ này đều lazy nên bỏ fetch là N+1 theo số thành viên.
      */
     @Query("""
             select distinct gr from Group gr
             left join fetch gr.members m
-            left join fetch m.pet mp
-            left join fetch mp.petProfile
+            left join fetch m.account mp
+            left join fetch mp.accountProfile
             where gr.id = :id
             """)
     Optional<Group> findDetailById(@Param("id") Integer id);
@@ -32,8 +32,8 @@ public interface GroupRepository extends JpaRepository<Group, Integer> {
     @Query("""
             select distinct gr from Group gr
             left join fetch gr.members m
-            left join fetch m.pet mp
-            left join fetch mp.petProfile
+            left join fetch m.account mp
+            left join fetch mp.accountProfile
             where gr.id in :ids
             """)
     List<Group> findAllDetailByIds(@Param("ids") List<Integer> ids);

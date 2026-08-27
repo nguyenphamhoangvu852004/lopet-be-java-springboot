@@ -1,7 +1,8 @@
 package com.nguyenvu.lopet.config;
 
+import java.util.Arrays;
+
 import com.nguyenvu.lopet.security.AuthInterceptor;
-import com.nguyenvu.lopet.security.petcontext.PetContextInterceptor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
@@ -14,32 +15,35 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 public class WebConfig implements WebMvcConfigurer {
 
     private final AuthInterceptor authInterceptor;
-    private final PetContextInterceptor petContextInterceptor;
 
     @Value("${lopet.cors.allowed-origins}")
     private String[] allowedOrigins;
 
     /**
-     * Thứ tự BẮT BUỘC: {@code authInterceptor} trước, {@code petContextInterceptor} sau. Interceptor
-     * thứ hai cần accountId đã xác thực để so quyền sở hữu của {@code X-Pet-Id}; đảo thứ tự thì mọi
-     * endpoint tương tác đều trả 403 vì chưa có danh tính nào để so.
-     *
-     * <p>{@code order()} khai tường minh thay vì dựa vào thứ tự gọi {@code addInterceptor}: thứ tự
-     * ngầm định đúng cho tới lúc ai đó chèn một interceptor thứ ba vào giữa.
+     * {@code order()} khai tường minh thay vì dựa vào thứ tự gọi {@code addInterceptor}: thứ tự ngầm
+     * định đúng cho tới lúc ai đó chèn interceptor thứ hai vào. {@code authInterceptor} đặt danh tính
+     * cho cả request nên bất cứ interceptor nào thêm sau đều phải chạy sau nó.
      */
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(authInterceptor).order(0);
-        registry.addInterceptor(petContextInterceptor).order(1);
     }
 
     /**
-     * Trùng {@code corsMiddleware}: origin {@code *}, đúng 5 method, và danh sách header cho phép
-     * y hệt. Không bật {@code allowCredentials} vì bản TS cũng không bật (và không thể bật cùng
-     * origin {@code *}).
+     * Giữ đúng {@code corsMiddleware} của bản TS: 5 method và danh sách header cho phép y hệt.
+     *
+     * <p>Điểm khác duy nhất là {@code allowCredentials}, và nó CÓ ĐIỀU KIỆN. Refresh token nay nằm
+     * trong cookie nên trình duyệt chỉ gửi kèm khi request đặt {@code credentials: 'include'} VÀ
+     * server cho phép credentials — thiếu vế sau thì {@code /v1/auth/refresh} luôn thấy cookie rỗng.
+     *
+     * <p>Nhưng bật kèm origin {@code *} thì mọi trang web đều gọi được {@code /v1/auth/refresh}
+     * bằng cookie của nạn nhân VÀ đọc được access token trong body — tức là chiếm tài khoản. Nên
+     * credentials chỉ bật khi {@code DOMAIN_CORS} liệt kê origin cụ thể; để {@code *} thì cookie
+     * không dùng được cross-origin, và đó là lựa chọn an toàn hơn trong hai cái sai.
      */
     @Override
     public void addCorsMappings(CorsRegistry registry) {
+        boolean wildcard = Arrays.asList(allowedOrigins).contains("*");
         registry.addMapping("/**")
                 .allowedOriginPatterns(allowedOrigins)
                 .allowedMethods(
@@ -50,6 +54,7 @@ public class WebConfig implements WebMvcConfigurer {
                         "PATCH",
                         "OPTIONS"
                 )
-                .allowedHeaders("*");
+                .allowedHeaders("*")
+                .allowCredentials(!wildcard);
     }
 }

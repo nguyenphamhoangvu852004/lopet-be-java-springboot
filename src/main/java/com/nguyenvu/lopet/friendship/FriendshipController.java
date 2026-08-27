@@ -18,7 +18,6 @@ import com.nguyenvu.lopet.friendship.entity.FriendshipStatus;
 import com.nguyenvu.lopet.security.Auth;
 import com.nguyenvu.lopet.security.CurrentUser;
 
-import com.nguyenvu.lopet.security.petcontext.RequireAnyPet;
 
 import lombok.RequiredArgsConstructor;
 
@@ -69,7 +68,6 @@ public class FriendshipController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @Auth
-    @RequireAnyPet
     public ApiResponse<FriendshipDtos.CreateFriendshipResponse> create(
             @RequestBody FriendshipDtos.CreateFriendshipRequest request) {
         return ApiResponse.created("Create friend ship successfully",
@@ -78,7 +76,6 @@ public class FriendshipController {
 
     @PostMapping("/accept")
     @Auth
-    @RequireAnyPet
     public ApiResponse<FriendshipDtos.ChangeStatusResponse> accept(
             @RequestBody FriendshipDtos.ChangeStatusRequest request) {
         return ApiResponse.ok("Accept friend ship successfully",
@@ -88,7 +85,6 @@ public class FriendshipController {
 
     @PostMapping("/reject")
     @Auth
-    @RequireAnyPet
     public ApiResponse<FriendshipDtos.ChangeStatusResponse> reject(
             @RequestBody FriendshipDtos.ChangeStatusRequest request) {
         return ApiResponse.ok("Reject friend ship successfully",
@@ -98,7 +94,6 @@ public class FriendshipController {
 
     @DeleteMapping
     @Auth
-    @RequireAnyPet
     public ApiResponse<FriendshipDtos.DeleteFriendshipResponse> delete(
             @RequestBody FriendshipDtos.DeleteFriendshipRequest request) {
         return ApiResponse.ok("Delete friend ship successfully",

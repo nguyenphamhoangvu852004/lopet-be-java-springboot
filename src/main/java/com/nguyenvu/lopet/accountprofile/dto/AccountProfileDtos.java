@@ -4,10 +4,11 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import com.nguyenvu.lopet.account.dto.AccountViews.AccountBrief;
+import com.nguyenvu.lopet.accountprofile.entity.ProfileVisibility;
 
 public final class AccountProfileDtos {
 
-    /** Chín trường — dùng cho GET /v1/account-profiles/me, đường đọc duy nhất còn lại */
+    /** Hồ sơ của CHÍNH MÌNH — {@code GET /v1/account-profiles/me} */
     public record ProfileSummary(
             Integer id,
             String fullName,
@@ -17,7 +18,26 @@ public final class AccountProfileDtos {
             String coverUrl,
             LocalDate dateOfBirth,
             String hometown,
-            Integer sex) {
+            Integer sex,
+            ProfileVisibility visibility) {
+    }
+
+    /**
+     * Hồ sơ của NGƯỜI KHÁC — {@code GET /v1/account-profiles/accounts/{id}}.
+     *
+     * <p>Cố ý hẹp hơn {@link ProfileSummary}: không có {@code phoneNumber}, {@code dateOfBirth},
+     * {@code hometown}. Ba trường đó là dữ liệu liên lạc và nhận dạng, và việc một người mở hồ sơ ở
+     * mức PUBLIC không có nghĩa họ muốn phát số điện thoại của mình ra cho cả internet. Cũng không có
+     * {@code visibility}: cấu hình riêng tư của một người không phải việc của người xem.
+     */
+    public record PublicProfile(
+            Integer id,
+            Integer accountId,
+            String username,
+            String fullName,
+            String bio,
+            String avatarUrl,
+            String coverUrl) {
     }
 
     /**
@@ -38,23 +58,8 @@ public final class AccountProfileDtos {
             String hometown,
             String avatarUrl,
             String coverUrl,
+            ProfileVisibility visibility,
             AccountBrief account) {
-    }
-
-    /**
-     * Body của {@code PUT /v1/account-profiles} (biến thể JSON). Không có trường ảnh: đổi avatar/cover chỉ
-     * làm được qua biến thể multipart, vì JSON không mang được file.
-     *
-     * <p>Không có annotation validation — port nguyên trạng từ bản TypeScript vốn không có schema
-     * Joi cho endpoint này.
-     */
-    public record UpdateProfileRequest(
-            String fullName,
-            String phoneNumber,
-            String bio,
-            String dateOfBirth,
-            String hometown,
-            Integer sex) {
     }
 
     private AccountProfileDtos() {

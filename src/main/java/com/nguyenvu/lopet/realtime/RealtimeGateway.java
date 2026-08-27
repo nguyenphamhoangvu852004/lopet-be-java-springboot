@@ -1,62 +1,59 @@
 package com.nguyenvu.lopet.realtime;
 
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 
-import com.corundumstudio.socketio.SocketIOServer;
-
-import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 
 /**
  * Điểm phát sự kiện realtime duy nhất — thay cho {@code res.io.to(room).emit(...)} của Express.
  *
- * <p>Tên phòng và tên sự kiện là HỢP ĐỒNG với client, không phải chi tiết nội bộ:
+ * <p><b>Destination là HỢP ĐỒNG với client</b>, không phải chi tiết nội bộ. Bản Socket.IO cũ tách
+ * làm hai mảnh: một tên phòng ({@code user_<id>}) cộng một tên sự kiện ({@code chat messsage}).
+ * STOMP chỉ có một mảnh, nên tên sự kiện được nhập vào chính destination:
  * <ul>
- *   <li>phòng {@code user_<accountId>} — mỗi kết nối tự vào phòng của mình khi handshake xong</li>
- *   <li>phòng {@code object_<notificationId>} — dùng cho sự kiện đổi trạng thái thông báo</li>
- *   <li>sự kiện {@code chat messsage} — viết sai chính tả (ba chữ s) trong bản gốc; client đang
- *       lắng nghe đúng chuỗi đó nên sửa lại là làm hỏng chat</li>
+ *   <li>{@code /topic/user.<accountId>/chat} — tin nhắn mới tới người nhận</li>
+ *   <li>{@code /topic/user.<accountId>/notification} — thông báo mới</li>
+ *   <li>{@code /topic/user.<accountId>/message-status} — trạng thái tin nhắn báo về NGƯỜI GỬI</li>
+ *   <li>{@code /topic/notification.<notificationId>} — đổi trạng thái của một thông báo cụ thể
+ *       (thay cho phòng {@code object_<id>}); đây là destination duy nhất nhiều người cùng nghe</li>
  * </ul>
  *
- * <p>Luồng trạng thái tin nhắn ("đã gửi / đã nhận / đã xem") dùng ba sự kiện, và khác với những
- * sự kiện trên ở chỗ có cả chiều CLIENT → SERVER:
- * <ul>
- *   <li>{@code message delivered} (client → server) — người nhận báo lô tin đã tới thiết bị;</li>
- *   <li>{@code message read} (client → server) — người nhận mở hội thoại với một người;</li>
- *   <li>{@code message status} (server → NGƯỜI GỬI) — kết quả của hai sự kiện trên, gộp theo người
- *       gửi để một lần đọc cả hội thoại chỉ tốn một sự kiện.</li>
- * </ul>
- * Hai sự kiện đến được đăng ký bởi {@code MessageSocketHandlers} qua {@link SocketEventRegistrar}.
+ * <p>Ba destination đầu chỉ chủ nhân của {@code accountId} mới subscribe được —
+ * {@link StompAuthChannelInterceptor} chặn ở frame SUBSCRIBE. Bản Socket.IO cũ không có ràng buộc
+ * này: sự kiện {@code join room} nhận tên phòng tuỳ ý nên một tài khoản bất kỳ vào được phòng của
+ * người khác.
+ *
+ * <p>Chiều CLIENT → SERVER không đi qua lớp này; nó là {@code @MessageMapping} trong
+ * {@code MessageStompController} ({@code /app/message.delivered}, {@code /app/message.read}).
+ *
+ * <p>Payload serialize bằng ObjectMapper của Spring, tức là đã có sẵn định dạng ngày của
+ * {@link com.nguyenvu.lopet.config.JacksonConfig} — không còn cầu Jackson riêng như thời
+ * netty-socketio.
  */
-@Slf4j
 @Component
 @RequiredArgsConstructor
 public class RealtimeGateway {
 
-    public static final String EVENT_CHAT_MESSAGE = "chat messsage";
-    public static final String EVENT_NOTIFICATION = "notification";
-    public static final String EVENT_CHANGE_STATUS = "change status";
-    public static final String EVENT_MESSAGE_STATUS = "message status";
-    public static final String CLIENT_EVENT_MESSAGE_DELIVERED = "message delivered";
-    public static final String CLIENT_EVENT_MESSAGE_READ = "message read";
+    public static final String CHANNEL_CHAT = "chat";
+    public static final String CHANNEL_NOTIFICATION = "notification";
+    public static final String CHANNEL_MESSAGE_STATUS = "message-status";
 
-    private final SocketIOServer socketIOServer;
+    /** Tiền tố của destination riêng-người-dùng; {@link StompAuthChannelInterceptor} soi theo nó */
+    public static final String USER_TOPIC_PREFIX = "/topic/user.";
+    public static final String NOTIFICATION_TOPIC_PREFIX = "/topic/notification.";
 
-    public static String userRoom(Object accountId) {
-        return "user_" + accountId;
+    private final SimpMessagingTemplate messagingTemplate;
+
+    public static String userTopic(Object accountId, String channel) {
+        return USER_TOPIC_PREFIX + accountId + "/" + channel;
     }
 
-    public static String objectRoom(Object objectId) {
-        return "object_" + objectId;
+    public static String notificationTopic(Object notificationId) {
+        return NOTIFICATION_TOPIC_PREFIX + notificationId;
     }
 
-    public void emit(String room, String event, Object payload) {
-        socketIOServer.getRoomOperations(room).sendEvent(event, payload);
-    }
-
-    @PreDestroy
-    public void shutdown() {
-        log.info("Đang dừng Socket.IO server");
+    public void emit(String destination, Object payload) {
+        messagingTemplate.convertAndSend(destination, payload);
     }
 }

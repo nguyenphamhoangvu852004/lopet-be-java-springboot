@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,12 +35,11 @@ import com.nguyenvu.lopet.group.entity.GroupMemberRole;
 import com.nguyenvu.lopet.group.entity.GroupType;
 import com.nguyenvu.lopet.group.repository.GroupMemberRepository;
 import com.nguyenvu.lopet.group.repository.GroupRepository;
-import com.nguyenvu.lopet.pet.PetService;
-import com.nguyenvu.lopet.pet.dto.PetDtos;
 import com.nguyenvu.lopet.post.dto.PostDtos;
+import com.nguyenvu.lopet.post.entity.MediaType;
 import com.nguyenvu.lopet.post.entity.PostScope;
+import com.nguyenvu.lopet.post.repository.PostMediaRepository;
 import com.nguyenvu.lopet.post.repository.PostRepository;
-import com.nguyenvu.lopet.security.petcontext.PetContextTestSupport;
 import com.nguyenvu.lopet.support.IntegrationTestBase;
 
 /**
@@ -50,9 +50,6 @@ import com.nguyenvu.lopet.support.IntegrationTestBase;
  * SERVICE vì các quy tắc còn lại — "ai được đăng vào group nào", "comment cha có thuộc đúng bài
  * không" — không nằm trong câu truy vấn mà nằm ở PostService/CommentService.
  *
- * <p>Mỗi tài khoản trong bộ test có ĐÚNG MỘT thú cưng, nên các hàm trợ giúp vẫn nhận id tài khoản
- * như trước và tự tra ra pet tương ứng qua {@link #petOf}. Nhờ đó thân các test không đổi và diff
- * so với bản trước khi đổi khoá ngoại đọc được là "cùng những quy tắc đó, chủ thể khác đi".
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @DisplayName("Phân quyền phía ghi — tầng service")
@@ -86,7 +83,7 @@ class PostAuthorizationIntegrationTest extends IntegrationTestBase {
     @Autowired
     private FriendshipRepository friendshipRepository;
     @Autowired
-    private PetService petService;
+    private PostMediaRepository postMediaRepository;
 
     private Integer author;
     private Integer friend;
@@ -94,9 +91,6 @@ class PostAuthorizationIntegrationTest extends IntegrationTestBase {
     private Integer groupMember;
     private Integer publicGroup;
     private Integer privateGroup;
-
-    /** accountId -> petId. Mỗi tài khoản đúng một thú cưng trong bộ test này. */
-    private final Map<Integer, Integer> pets = new HashMap<>();
 
     @BeforeAll
     void seed() {
@@ -111,12 +105,6 @@ class PostAuthorizationIntegrationTest extends IntegrationTestBase {
             stranger = strangerAccount.getId();
             groupMember = memberAccount.getId();
 
-            for (Integer accountId : List.of(author, friend, stranger, groupMember)) {
-                pets.put(accountId, petService.create(accountId, new PetDtos.CreatePetRequest(
-                        "authz-pet-" + System.nanoTime(), "DOG", null, "MALE",
-                        LocalDate.of(2023, 3, 12), "PUBLIC")).petId());
-            }
-
             friendshipRepository.save(Friendship.builder().sender(authorAccount).receiver(friendAccount)
                     .status(FriendshipStatus.ACCEPTED).build());
             // Lời mời PENDING — cố ý để chứng minh nó KHÔNG được tính là bạn bè
@@ -130,22 +118,12 @@ class PostAuthorizationIntegrationTest extends IntegrationTestBase {
             publicGroup = open.getId();
             privateGroup = closed.getId();
 
-            // Thành viên nhóm là THÚ CƯNG của memberAccount, không phải bản thân tài khoản
             for (Group group : List.of(open, closed)) {
                 groupMemberRepository.save(GroupMember.builder()
-                        .groupId(group.getId()).petId(petOf(groupMember))
+                        .groupId(group.getId()).accountId(groupMember)
                         .role(GroupMemberRole.MEMBER).joinedAt(LocalDateTime.now()).build());
             }
         });
-    }
-
-    /**
-     * {@code PetContext} sống trong request attribute, mà JUnit tái dùng thread giữa các test — bỏ
-     * bước dọn thì pet của test trước rò sang test sau và các khẳng định về quyền mất nghĩa.
-     */
-    @AfterEach
-    void clearPetContext() {
-        PetContextTestSupport.clear();
     }
 
     private Account account(String name) {
@@ -154,34 +132,38 @@ class PostAuthorizationIntegrationTest extends IntegrationTestBase {
                 .email(unique + "@authz.local").username(unique).password("x").isBanned(0).build());
     }
 
-    private Integer petOf(Integer accountId) {
-        return accountId == null ? null : pets.get(accountId);
-    }
-
-    /** Nhân danh thú cưng của tài khoản này cho lời gọi service kế tiếp */
-    private void actAs(Integer accountId) {
-        PetContextTestSupport.actAs(petOf(accountId));
-    }
-
     private Integer personalPost(PostScope scope) {
-        actAs(author);
-        return postService.create("personal-" + scope + "-" + System.nanoTime(), null,
+        return postService.create(author, "personal-" + scope + "-" + System.nanoTime(), null,
                 scope.name(), List.of()).postId();
     }
 
+    /** Bài của {@code author} kèm {@code count} ảnh, trả về danh sách id media theo đúng thứ tự */
+    private List<Integer> postWithMedia(int count) {
+        List<PostService.UploadedMedia> medias = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            medias.add(new PostService.UploadedMedia("https://cdn.local/anh-" + i + "-" + System.nanoTime(),
+                    MediaType.IMAGE));
+        }
+        PostDtos.CreatePostResponse created = postService.create(author,
+                "bai-co-media-" + System.nanoTime(), null, PostScope.PUBLIC.name(), medias);
+
+        List<Integer> ids = new ArrayList<>();
+        ids.add(created.postId());
+        created.postMedias().forEach(media -> ids.add(media.id()));
+        return ids;
+    }
+
     private Integer groupPost(Integer groupId, Integer accountId) {
-        actAs(accountId);
-        return postService.create("group-" + groupId + "-" + System.nanoTime(), groupId,
+        return postService.create(accountId, "group-" + groupId + "-" + System.nanoTime(), groupId,
                 PostScope.PUBLIC.name(), List.of()).postId();
     }
 
     private Integer comment(Integer accountId, Integer postId, Integer replyTo) {
-        actAs(accountId);
         return commentService.create(accountId, postId, replyTo, "xin chao", "").commentId();
     }
 
     private PostDtos.PostDetail readAs(Integer postId, Integer viewerId) {
-        return postService.getOneById(postId, viewerId, petOf(viewerId));
+        return postService.getOneById(postId, viewerId);
     }
 
     @Nested
@@ -203,7 +185,6 @@ class PostAuthorizationIntegrationTest extends IntegrationTestBase {
         @Test
         @DisplayName("nhóm PUBLIC: người ngoài nhóm KHÔNG đăng được")
         void nhom_public_nguoi_ngoai_khong_dang_duoc() {
-            actAs(stranger);
             assertThatThrownBy(() -> groupPost(publicGroup, stranger))
                     .isInstanceOf(ForbiddenException.class);
         }
@@ -249,8 +230,7 @@ class PostAuthorizationIntegrationTest extends IntegrationTestBase {
         @Test
         @DisplayName("bài nhóm không nhận scope FRIEND")
         void bai_nhom_khong_nhan_FRIEND() {
-            actAs(groupMember);
-            assertThatThrownBy(() -> postService.create("scope sai", publicGroup,
+            assertThatThrownBy(() -> postService.create(groupMember, "scope sai", publicGroup,
                     PostScope.FRIEND.name(), List.of())).isInstanceOf(BadRequestException.class);
         }
 
@@ -265,33 +245,29 @@ class PostAuthorizationIntegrationTest extends IntegrationTestBase {
         @Test
         @DisplayName("scope rác bị từ chối")
         void scope_rac_bi_tu_choi() {
-            actAs(author);
-            assertThatThrownBy(() -> postService.create("x", null, "EVERYONE", List.of()))
+            assertThatThrownBy(() -> postService.create(author, "x", null, "EVERYONE", List.of()))
                     .isInstanceOf(BadRequestException.class);
         }
     }
 
     @Nested
-    @DisplayName("Tác giả luôn là pet trong PetContext")
-    class TacGiaLaPet {
+    @DisplayName("Tác giả luôn là tài khoản gọi")
+    class TacGiaLaTaiKhoan {
 
         @Test
-        @DisplayName("bài mới mang pet_id của pet đang thao tác")
-        void bai_moi_mang_pet_id() {
+        @DisplayName("bài mới mang account_id của người đăng")
+        void bai_moi_mang_account_id() {
             Integer postId = personalPost(PostScope.PUBLIC);
-            Integer petId = inTransaction(() ->
-                    postRepository.findByIdInternal(postId).orElseThrow().getPet().getId());
-            assertThat(petId).isEqualTo(petOf(author));
+            Integer accountId = inTransaction(() ->
+                    postRepository.findByIdInternal(postId).orElseThrow().getAccount().getId());
+            assertThat(accountId).isEqualTo(author);
         }
 
         @Test
-        @DisplayName("không có pet trong context thì không đăng bài được")
-        void thieu_pet_khong_dang_duoc() {
-            // Endpoint quên gắn @RequirePet là lỗi cấu hình, không phải trạng thái hợp lệ — service
-            // phải từ chối chứ không âm thầm chọn một con nào đó.
-            PetContextTestSupport.clear();
-            assertThatThrownBy(() -> postService.create("khong co pet", null,
-                    PostScope.PUBLIC.name(), List.of())).isInstanceOf(RuntimeException.class);
+        @DisplayName("tài khoản không tồn tại thì không đăng bài được")
+        void tai_khoan_khong_ton_tai_khong_dang_duoc() {
+            assertThatThrownBy(() -> postService.create(-1, "khong co tai khoan", null,
+                    PostScope.PUBLIC.name(), List.of())).isInstanceOf(BadRequestException.class);
         }
     }
 
@@ -320,14 +296,73 @@ class PostAuthorizationIntegrationTest extends IntegrationTestBase {
         }
 
         @Test
-        @DisplayName("quyền sửa thuộc về CHỦ TÀI KHOẢN của pet tác giả")
-        void chu_tai_khoan_van_sua_duoc() {
+        @DisplayName("tác giả sửa được bài của chính mình")
+        void tac_gia_van_sua_duoc() {
             Integer postId = personalPost(PostScope.PUBLIC);
-            // Không actAs con nào cả: update xét sở hữu ở mức tài khoản, nên nó không được phụ thuộc
-            // vào việc người dùng đang chọn thú cưng nào.
-            PetContextTestSupport.clear();
             assertThat(postService.update(postId, author, "sua lai", PostScope.PUBLIC.name(),
                     List.of(), List.of()).postId()).isEqualTo(postId);
+        }
+
+        /**
+         * Ca hồi quy quan trọng nhất của nhóm này: trước bản vá, {@code null} bị gộp với danh sách
+         * rỗng nên sửa mỗi nội dung là xoá sạch ảnh của bài — mất dữ liệu, im lặng, không hoàn tác.
+         */
+        @Test
+        @DisplayName("không gửi oldIdsMedia thì media được giữ nguyên")
+        void khong_nhac_toi_media_thi_giu_nguyen() {
+            List<Integer> ids = postWithMedia(2);
+            Integer postId = ids.get(0);
+
+            PostDtos.UpdatePostResponse response = postService.update(postId, author, "chi sua caption",
+                    PostScope.PUBLIC.name(), null, List.of());
+
+            assertThat(response.postMedias()).hasSize(2);
+            assertThat(postMediaRepository.findByPostId(postId)).hasSize(2);
+        }
+
+        @Test
+        @DisplayName("gửi danh sách rỗng thì xoá hết media")
+        void danh_sach_rong_thi_xoa_het() {
+            List<Integer> ids = postWithMedia(2);
+            Integer postId = ids.get(0);
+
+            PostDtos.UpdatePostResponse response = postService.update(postId, author, "bo het anh",
+                    PostScope.PUBLIC.name(), List.of(), List.of());
+
+            assertThat(response.postMedias()).isEmpty();
+            assertThat(postMediaRepository.findByPostId(postId)).isEmpty();
+        }
+
+        @Test
+        @DisplayName("chỉ giữ đúng những id được liệt kê")
+        void giu_dung_id_duoc_liet_ke() {
+            List<Integer> ids = postWithMedia(3);
+            Integer postId = ids.get(0);
+            Integer giuLai = ids.get(1);
+
+            PostDtos.UpdatePostResponse response = postService.update(postId, author, "bo bot anh",
+                    PostScope.PUBLIC.name(), List.of(giuLai), List.of());
+
+            assertThat(response.postMedias()).extracting(PostDtos.MediaWithId::id).containsExactly(giuLai);
+            assertThat(postMediaRepository.findByPostId(postId)).extracting(media -> media.getId())
+                    .containsExactly(giuLai);
+        }
+
+        /**
+         * Nhận id của bài khác thì response trả về media không thuộc bài đang sửa, mà media đó cũng
+         * không thật sự được giữ lại — hai bên nói khác nhau.
+         */
+        @Test
+        @DisplayName("id media của bài khác bị từ chối, media của bài này còn nguyên")
+        void id_cua_bai_khac_bi_tu_choi() {
+            List<Integer> cua_toi = postWithMedia(1);
+            List<Integer> cua_bai_khac = postWithMedia(1);
+
+            assertThatThrownBy(() -> postService.update(cua_toi.get(0), author, "muon anh bai khac",
+                    PostScope.PUBLIC.name(), List.of(cua_bai_khac.get(1)), List.of()))
+                    .isInstanceOf(BadRequestException.class);
+
+            assertThat(postMediaRepository.findByPostId(cua_toi.get(0))).hasSize(1);
         }
     }
 
@@ -376,17 +411,16 @@ class PostAuthorizationIntegrationTest extends IntegrationTestBase {
         }
 
         @Test
-        @DisplayName("bình luận mang danh tính của pet, kèm hồ sơ công khai của nó")
-        void binh_luan_mang_danh_tinh_pet() {
+        @DisplayName("bình luận mang danh tính tài khoản, kèm hồ sơ của nó")
+        void binh_luan_mang_danh_tinh_tai_khoan() {
             Integer postId = personalPost(PostScope.PUBLIC);
             comment(stranger, postId, null);
 
-            actAs(stranger);
-            var items = commentService.getAllFromPost(postId, stranger, petOf(stranger)).comments();
+            var items = commentService.getAllFromPost(postId, stranger).comments();
             assertThat(items).hasSize(1);
-            assertThat(items.getFirst().pet().id()).isEqualTo(petOf(stranger));
-            // Hồ sơ lấy từ pet_profiles: handle luôn có giá trị vì PetService tạo hồ sơ cùng transaction
-            assertThat(items.getFirst().pet().profile().handle()).isNotBlank();
+            assertThat(items.getFirst().account().id()).isEqualTo(stranger);
+            // Hồ sơ nằm trong đồ thị nạp nên object profile luôn khác null
+            assertThat(items.getFirst().account().profile()).isNotNull();
         }
 
         @Test
@@ -395,11 +429,11 @@ class PostAuthorizationIntegrationTest extends IntegrationTestBase {
             Integer postId = personalPost(PostScope.PRIVATE);
             comment(author, postId, null);
 
-            assertThatThrownBy(() -> commentService.getAllFromPost(postId, stranger, petOf(stranger)))
+            assertThatThrownBy(() -> commentService.getAllFromPost(postId, stranger))
                     .isInstanceOf(BadRequestException.class);
-            assertThatThrownBy(() -> commentService.getAllFromPost(postId, null, null))
+            assertThatThrownBy(() -> commentService.getAllFromPost(postId, null))
                     .isInstanceOf(BadRequestException.class);
-            assertThat(commentService.getAllFromPost(postId, author, petOf(author)).comments()).hasSize(1);
+            assertThat(commentService.getAllFromPost(postId, author).comments()).hasSize(1);
         }
     }
 
@@ -444,12 +478,10 @@ class PostAuthorizationIntegrationTest extends IntegrationTestBase {
     class ThaTim {
 
         private PostDtos.ReactResponse like(Integer postId, Integer accountId) {
-            actAs(accountId);
             return postService.like(postId, accountId);
         }
 
         private PostDtos.ReactResponse unlike(Integer postId, Integer accountId) {
-            actAs(accountId);
             return postService.unlike(postId, accountId);
         }
 
@@ -506,10 +538,10 @@ class PostAuthorizationIntegrationTest extends IntegrationTestBase {
             Integer postId = personalPost(PostScope.PRIVATE);
 
             assertThat(inTransaction(() ->
-                    postRepository.findVisibleById(postId, stranger, petOf(stranger)))).isEmpty();
+                    postRepository.findVisibleById(postId, stranger))).isEmpty();
             // Chủ bài vẫn nạp được bình thường — bộ lọc không chặn nhầm người có quyền
             assertThat(inTransaction(() ->
-                    postRepository.findVisibleById(postId, author, petOf(author)))).isPresent();
+                    postRepository.findVisibleById(postId, author))).isPresent();
         }
 
         @Test
@@ -518,8 +550,8 @@ class PostAuthorizationIntegrationTest extends IntegrationTestBase {
             Integer postId = personalPost(PostScope.PUBLIC);
 
             Integer ownerId = inTransaction(() ->
-                    postRepository.findVisibleById(postId, stranger, petOf(stranger))
-                            .orElseThrow().getPet().getAccount().getId());
+                    postRepository.findVisibleById(postId, stranger)
+                            .orElseThrow().getAccount().getId());
             assertThat(ownerId).isEqualTo(author);
         }
 
@@ -529,9 +561,9 @@ class PostAuthorizationIntegrationTest extends IntegrationTestBase {
             Integer postId = groupPost(privateGroup, groupMember);
 
             assertThat(inTransaction(() ->
-                    postRepository.findVisibleById(postId, stranger, petOf(stranger)))).isEmpty();
+                    postRepository.findVisibleById(postId, stranger))).isEmpty();
             assertThat(inTransaction(() ->
-                    postRepository.findVisibleById(postId, groupMember, petOf(groupMember)))).isPresent();
+                    postRepository.findVisibleById(postId, groupMember))).isPresent();
         }
     }
 
@@ -543,24 +575,19 @@ class PostAuthorizationIntegrationTest extends IntegrationTestBase {
         @DisplayName("mọi luồng đọc đều che cùng một bài riêng tư")
         void moi_luong_doc_deu_che() {
             Integer postId = personalPost(PostScope.PRIVATE);
-            Integer viewerPet = petOf(stranger);
-
-            assertThatThrownBy(() -> postService.getOneById(postId, stranger, viewerPet))
+            assertThatThrownBy(() -> postService.getOneById(postId, stranger))
                     .isInstanceOf(NotFoundException.class);
 
-            assertThat(postService.getByAccountId(author, stranger, viewerPet))
+            assertThat(postService.getByAccountId(author, stranger))
                     .noneMatch(post -> post.postId().equals(postId));
 
-            assertThat(postService.getByPetId(petOf(author), stranger, viewerPet))
+            assertThat(postService.getAll(null, null, stranger))
                     .noneMatch(post -> post.postId().equals(postId));
 
-            assertThat(postService.getAll(null, null, stranger, viewerPet))
+            assertThat(postService.getSuggestList(stranger))
                     .noneMatch(post -> post.postId().equals(postId));
 
-            assertThat(postService.getSuggestList(stranger, viewerPet))
-                    .noneMatch(post -> post.postId().equals(postId));
-
-            assertThatThrownBy(() -> commentService.getAllFromPost(postId, stranger, viewerPet))
+            assertThatThrownBy(() -> commentService.getAllFromPost(postId, stranger))
                     .isInstanceOf(BadRequestException.class);
         }
     }

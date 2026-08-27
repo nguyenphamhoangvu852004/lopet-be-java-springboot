@@ -35,13 +35,12 @@ public abstract class IntegrationTestBase {
     /**
      * URL Redis với database index RIÊNG cho từng lớp test.
      *
-     * <p>Bắt buộc phải tách, không phải cho gọn: {@code PetOwnerResolver} cache theo khoá
-     * {@code pet:owner:<petId>}, mà mỗi lớp test có database MySQL riêng nên petId đếm lại từ 1 và
-     * TRÙNG NHAU giữa các lớp. Dùng chung một Redis database thì lớp chạy sau đọc được chủ sở hữu của
-     * pet thuộc lớp chạy trước, và mọi kiểm tra quyền sở hữu pet đỏ theo thứ tự chạy — một loại hỏng
-     * chỉ xuất hiện khi chạy cả bộ, không bao giờ thấy khi chạy lẻ một lớp.
+     * <p>Mỗi lớp test có database MySQL riêng nên id các bản ghi đếm lại từ 1 và TRÙNG NHAU giữa các
+     * lớp. Dùng chung một Redis database thì lớp chạy sau đọc trúng giá trị cache của lớp chạy trước,
+     * và test đỏ theo thứ tự chạy — một loại hỏng chỉ xuất hiện khi chạy cả bộ, không bao giờ thấy
+     * khi chạy lẻ một lớp.
      *
-     * <p>Index 0 để dành cho ứng dụng dev đang chạy trên cùng Redis: nó cũng cache đúng khoá đó.
+     * <p>Index 0 để dành cho ứng dụng dev đang chạy trên cùng Redis.
      */
     public static String redisUrl(int database) {
         String host = System.getenv().getOrDefault("TEST_REDIS_HOST", "localhost");

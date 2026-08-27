@@ -19,9 +19,6 @@ public final class MessageDtos {
             LocalDateTime readAt) {
     }
 
-    public record CreateMessageRequest(String content, String receiverId) {
-    }
-
     /**
      * Bản TS trả về CHÍNH input DTO chứ không phải bản ghi vừa lưu — bốn trường đầu giữ nguyên hình
      * dạng đó, kể cả việc hai id là chuỗi đúng như client gửi lên.
@@ -40,44 +37,23 @@ public final class MessageDtos {
     public record ChangeStatusResponse(boolean success, String message) {
     }
 
-    /** Payload của sự kiện socket {@code chat messsage} */
+    /** Payload đẩy tới {@code /topic/user.<receiverId>/chat} */
     public record ChatMessageEvent(CreateMessageResponse message, String from) {
     }
 
     /**
-     * Ack "đã nhận" do client gửi lên — qua socket ({@code message delivered}) hoặc qua REST.
+     * Ack "đã nhận" do client gửi lên — qua WebSocket ({@code /app/message.delivered}) hoặc qua REST.
      *
      * <p>Là lô chứ không phải từng tin: khi mở lại app sau lúc offline, client nhận cả chục tin một
-     * lúc và một request cho mỗi tin vừa tốn round-trip vừa sinh chục sự kiện socket dội ngược lại
-     * người gửi.
-     *
-     * <p>Cố ý KHÔNG dùng record: netty-socketio deserialize payload đến bằng ObjectMapper Jackson 2
-     * riêng của nó, không có module {@code parameter-names} của Spring nào được nạp vào đó. Class
-     * thường với setter thì chắc chắn dựng được ở cả hai đường REST và socket.
+     * lúc và một request cho mỗi tin vừa tốn round-trip vừa sinh chục sự kiện dội ngược lại người gửi.
      */
-    public static final class DeliveredAckRequest {
-        private List<Integer> messageIds;
-
-        public List<Integer> getMessageIds() {
-            return messageIds;
-        }
-
-        public void setMessageIds(List<Integer> messageIds) {
-            this.messageIds = messageIds;
-        }
+    public record DeliveredAckRequest(List<Integer> messageIds) {
     }
 
-    /** Đánh dấu đã xem toàn bộ hội thoại với một người — payload của {@code message read} */
-    public static final class ReadAckRequest {
-        private Integer partnerId;
-
-        public Integer getPartnerId() {
-            return partnerId;
-        }
-
-        public void setPartnerId(Integer partnerId) {
-            this.partnerId = partnerId;
-        }
+    /**
+     * Đánh dấu đã xem toàn bộ hội thoại với một người — payload của {@code /app/message.read}.
+     */
+    public record ReadAckRequest(Integer partnerId) {
     }
 
     /**

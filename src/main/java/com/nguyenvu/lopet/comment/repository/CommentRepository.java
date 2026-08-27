@@ -12,13 +12,13 @@ import com.nguyenvu.lopet.comment.entity.Comment;
 public interface CommentRepository extends JpaRepository<Comment, Integer> {
 
     /**
-     * Nạp kèm {@code pet.petProfile}: mọi bình luận hiển thị tác giả bằng handle/display name của hồ
-     * sơ công khai, nên để hồ sơ lazy là quay lại đúng N+1 mà bản TS mắc phải.
+     * Nạp kèm {@code account.accountProfile}: mọi bình luận hiển thị hồ sơ của tác giả, nên để hồ sơ
+     * lazy là quay lại đúng N+1 mà bản TS mắc phải.
      */
     @Query("""
             select distinct c from Comment c
-            left join fetch c.pet ap
-            left join fetch ap.petProfile
+            left join fetch c.account ap
+            left join fetch ap.accountProfile
             left join fetch c.parent
             where c.post.id = :postId
             order by c.createdAt desc
@@ -31,8 +31,8 @@ public interface CommentRepository extends JpaRepository<Comment, Integer> {
      */
     @Query("""
             select c from Comment c
-            left join fetch c.pet ap
-            left join fetch ap.petProfile
+            left join fetch c.account ap
+            left join fetch ap.accountProfile
             left join fetch c.post
             where c.id = :id
             """)

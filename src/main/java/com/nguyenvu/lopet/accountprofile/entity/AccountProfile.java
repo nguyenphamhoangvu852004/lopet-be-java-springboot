@@ -9,6 +9,8 @@ import com.nguyenvu.lopet.common.entity.BaseEntity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -59,6 +61,21 @@ public class AccountProfile extends BaseEntity {
 
     @Column(name = "coverUrl", columnDefinition = "text")
     private String coverUrl;
+
+    /**
+     * Mặc định PUBLIC để hàng cũ và hàng do {@code AccountProfileFactory} tạo lúc đăng ký không phải
+     * khai lại — đồng thời khớp {@code default 'PUBLIC'} của cột, nên dữ liệu đã có sẵn không cần
+     * backfill.
+     *
+     * <p>Cột này KHÔNG tự bảo vệ được gì: nó chỉ là dữ liệu. Việc thực thi nằm ở
+     * {@link com.nguyenvu.lopet.accountprofile.repository.AccountProfileVisibilityFilter}, và đó là
+     * chỗ DUY NHẤT được phép trả lời "người này có xem được hồ sơ kia không".
+     */
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "visibility", nullable = false,
+            columnDefinition = "enum('PUBLIC','FRIEND','PRIVATE') not null default 'PUBLIC'")
+    private ProfileVisibility visibility = ProfileVisibility.PUBLIC;
 
     /**
      * Phía nghịch của quan hệ 1-1: khoá ngoại nằm ở {@code accounts.profileId}. Tầng ownership cần

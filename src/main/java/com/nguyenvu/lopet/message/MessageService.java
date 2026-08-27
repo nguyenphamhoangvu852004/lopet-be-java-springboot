@@ -115,7 +115,7 @@ public class MessageService {
      * Id những tin đang chờ người này ack "đã nhận".
      *
      * <p>CHỈ đọc, không tự đánh dấu. Việc đánh dấu vẫn phải do client phát ack như mọi đường khác —
-     * xem {@link MessageSocketHandlers}: server tự suy ra DELIVERED chỉ vì thấy có kết nối sống thì
+     * xem {@link MessageStompController}: server tự suy ra DELIVERED chỉ vì thấy có kết nối sống thì
      * dấu "đã nhận" mất hết ý nghĩa. Ở đây client tải danh sách id về máy mình rồi mới ack, nên nó
      * ack đúng thứ nó thật sự cầm trong tay.
      */

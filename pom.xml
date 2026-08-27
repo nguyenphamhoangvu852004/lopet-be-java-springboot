@@ -16,7 +16,6 @@
 
 	<properties>
 		<java.version>21</java.version>
-		<netty-socketio.version>2.0.13</netty-socketio.version>
 		<cloudinary.version>2.3.0</cloudinary.version>
 		<resend.version>4.4.0</resend.version>
 	</properties>
@@ -25,6 +24,13 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-jpa</artifactId>
+		</dependency>
+		<!-- Source: https://mvnrepository.com/artifact/com.github.javafaker/javafaker -->
+		<dependency>
+			<groupId>com.github.javafaker</groupId>
+			<artifactId>javafaker</artifactId>
+			<version>1.0.2</version>
+			<scope>compile</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -37,6 +43,12 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webmvc</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springdoc</groupId>
+			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+			<version>3.0.3</version>
+			<scope>compile</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -67,11 +79,15 @@
 			file .env hiện tại không chạy được, tức là không còn thay thế trực tiếp được nữa.
 		-->
 
-		<!-- Socket.IO server nói đúng protocol EIO4 nên socket.io-client của frontend không phải đổi -->
+		<!--
+			Realtime là STOMP over WebSocket chạy ngay trên Tomcat (cổng 8080), thay cho netty-socketio
+			vốn phải mở một server Netty độc lập ở cổng riêng. Ngoài việc bớt được một cổng phải publish
+			và proxy, starter này dùng chung ObjectMapper (Jackson 3) với REST — payload realtime và
+			payload REST không còn có thể lệch định dạng nữa, xem config/JacksonConfig.
+		-->
 		<dependency>
-			<groupId>com.corundumstudio.socketio</groupId>
-			<artifactId>netty-socketio</artifactId>
-			<version>${netty-socketio.version}</version>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-websocket</artifactId>
 		</dependency>
 
 		<dependency>
@@ -109,6 +125,11 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webmvc-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-websocket-test</artifactId>
 			<scope>test</scope>
 		</dependency>
 		<!-- Source: https://mvnrepository.com/artifact/org.springframework.boot/spring-boot-actuator -->

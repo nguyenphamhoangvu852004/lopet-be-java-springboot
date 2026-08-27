@@ -43,8 +43,8 @@ Toàn bộ file liên quan tới authentication/authorization tìm thấy trong 
 | `auth/AuthController.java` | `com.nguyenvu.lopet.auth` | 4 endpoint, mount 2 tiền tố |
 | `config/WebConfig.java` | `com.nguyenvu.lopet.config` | Đăng ký `AuthInterceptor` + cấu hình CORS |
 | `common/exception/*.java` | `com.nguyenvu.lopet.common.exception` | `HttpException` + `GlobalExceptionHandler` |
-| `realtime/SocketIoConfig.java` | `com.nguyenvu.lopet.realtime` | Xác thực Socket.IO qua `AuthTokenListener` |
-| `realtime/SocketIoServerRunner.java` | `com.nguyenvu.lopet.realtime` | Vòng đời socket + watchdog kết nối chưa xác thực |
+| `realtime/StompAuthChannelInterceptor.java` | `com.nguyenvu.lopet.realtime` | Xác thực JWT ở frame CONNECT + guard destination trên SUBSCRIBE/SEND |
+| `realtime/WebSocketConfig.java` | `com.nguyenvu.lopet.realtime` | Endpoint `/ws`, broker `/topic`, đăng ký interceptor trên inbound channel |
 | `bootstrap/AuthorizationSeeder.java` | `com.nguyenvu.lopet.bootstrap` | Seed `permissions`/`roles`/`role_permission` |
 | `bootstrap/AdminInitializer.java` | `com.nguyenvu.lopet.bootstrap` | Tạo + cấp ADMIN cho tài khoản `INIT_ADMIN_*` |
 | `post/PostAccessGuard.java` | `com.nguyenvu.lopet.post` | Ownership cho bài viết |
@@ -126,7 +126,7 @@ HTTP Request
 | Câu hỏi | Trả lời | Nguồn |
 |---|---|---|
 | JWT được tạo ở đâu? | `JwtService.sign()`, gọi từ `AuthService.login()` — **chỉ ở đúng một chỗ** | `JwtService.java:74`, `AuthService.java:58-59` |
-| JWT được verify ở đâu? | Hai nơi độc lập: `JwtAuthenticationFilter` (HTTP) và `SocketIoConfig.authenticate` (WebSocket) | `JwtAuthenticationFilter.java:52`, `SocketIoConfig.java:120` |
+| JWT được verify ở đâu? | Hai nơi độc lập: `JwtAuthenticationFilter` (HTTP) và `StompAuthChannelInterceptor.authenticate` (WebSocket) | `JwtAuthenticationFilter.java:52`, `StompAuthChannelInterceptor.java:80` |
 | User identity lưu ở đâu? | `SecurityContextHolder` (ThreadLocal) → `UsernamePasswordAuthenticationToken.principal` là một `UserPrincipal` | `JwtAuthenticationFilter.java:56-57` |
 | Role/Authority lấy từ đâu? | **Từ claim `roles` trong JWT**, không bao giờ đọc lại DB trong luồng request | `JwtService.java:123`, `PermissionCatalog.java:72` |
 | Access decision thực hiện ở đâu? | `AuthInterceptor.preHandle` (authn), `RequirePermissionAspect` (permission), các `*AccessGuard` (ownership), service (capability/relationship), repository (visibility) | xem §1.2 |
@@ -168,8 +168,11 @@ AuthService.login(request)                      ← AuthService.java:45   @Trans
   ├─ JwtService.generateAccessToken(payload)                 ← secret ACCESS_TOKEN_SECRET
   └─ JwtService.generateRefreshToken(payload)                ← secret REFRESH_TOKEN_SECRET
   ▼
+AuthController.login → RefreshTokenCookie.write(response, refreshToken)
+  header: Set-Cookie: refreshToken=<jwt>; Max-Age=36000; Path=/; HttpOnly; SameSite=Lax
+  ▼
 ApiResponse.ok(HttpStatusMessage.OK, LoginResponse)
-  body: {"statusCode":200, "message":"OK", "data":{"id":.., "accessToken":"..", "refreshToken":".."}}
+  body: {"statusCode":200, "message":"OK", "data":{"id":.., "accessToken":".."}}
 ```
 
 ### 2.2 Trả lời 10 câu hỏi
@@ -185,7 +188,7 @@ ApiResponse.ok(HttpStatusMessage.OK, LoginResponse)
 | 7 | Authentication object tạo ở đâu? | **Không tạo lúc login.** Chỉ tạo ở mỗi request sau đó, trong `JwtAuthenticationFilter.java:57` (`new UsernamePasswordAuthenticationToken(...)`). Không có `AuthenticationManager` nào được gọi |
 | 8 | JWT generate ở đâu? | `JwtService.sign()` — `JwtService.java:74`, gọi từ `AuthService.java:58-59` |
 | 9 | JWT chứa claim gì? | Đúng 5 claim, đúng thứ tự: `id`, `email`, `roles`, `iat`, `exp` — `JwtService.java:77-82` |
-| 10 | Response trả gì? | `{id, accessToken, refreshToken}` — `LoginResponse.java:7`. Cố ý **không** có `roles` |
+| 10 | Response trả gì? | Body `{id, accessToken}` — `LoginResponse.java`. Cố ý **không** có `roles`. `refreshToken` **không nằm trong body**: nó ra bằng cookie `HttpOnly` (`RefreshTokenCookie.write`), nên JavaScript của client không đọc được |
 
 ### 2.3 Luồng của một request đã đăng nhập
 
@@ -208,7 +211,7 @@ Controller → *AccessGuard → Service → Repository
 | `POST /v1/auth/signup` | **Không cần token.** Bắt buộc có cờ Redis `email_verified:<email>` (`AuthService.java:68`). Cờ bị `deleteVerifiedFlag` **trước** khi kiểm trùng email/username (`:72`) | Trùng email/username → 409; password≠confirm → 400 |
 | `POST /v1/auth/reset` | **Không cần token.** Tiêu thụ cờ bằng `consumeVerifiedFlag` (GETDEL nguyên tử, `OtpStore.java:67`); thiếu cờ → `ForbiddenException` 403 (`AuthService.java:109`) | Ghi `passwordEncoder.encode(...)` vào `accounts.password` |
 | `POST /v1/auth/verify` | **Không cần token.** Nhận `{email, password}`, trả `{isValid:true}` nếu đúng mật khẩu | `AuthService.java:122-130`. Xem §18 `SEC-4` |
-| `POST /v1/auth/refresh` | **Không cần token.** Nhận `{refreshToken}` trong body; đọc lại tài khoản từ DB, chặn tài khoản bị khoá, trả cặp token mới | `AuthService.refresh`. Xem §3.6 |
+| `POST /v1/auth/refresh` | **Không cần token, không cần body.** Đọc refresh token từ cookie `refreshToken`; đọc lại tài khoản từ DB, chặn tài khoản bị khoá, trả access token mới trong body và ghi đè cookie bằng refresh token vừa xoay vòng. Thiếu cookie → 401 | `AuthService.refresh`. Xem §3.6 |
 
 **Logout:** `Not used in current implementation.` `SecurityConfig.java:34` gọi `logout(logout -> logout.disable())`; không có endpoint logout, không có blacklist token.
 
@@ -259,14 +262,14 @@ tính thay thế trực tiếp — xem §18 `SEC-1`.
 | Ký / dựng chuỗi | `JwtService.sign()` — `JwtService.java:74` | Dựng claims → base64url → `HEADER + "." + body + "." + hmac` |
 | HMAC | `JwtService.hmac()` — `JwtService.java:134` | `Mac.getInstance("HmacSHA256")`; lỗi → `IllegalStateException` |
 | Token validation + parsing | `JwtService.parse()` — `JwtService.java:89` | Tách 3 phần, so chữ ký, decode JSON, kiểm `exp` |
-| Điểm vào validation (HTTP + socket) | `JwtService.parseAccessToken()` — `JwtService.java:70` | Chỉ dùng `accessSecret` |
+| Điểm vào validation (HTTP + WebSocket) | `JwtService.parseAccessToken()` — `JwtService.java:57` | Chỉ dùng `accessSecret` |
 | Token extraction (HTTP) | `JwtAuthenticationFilter.extractToken()` — `JwtAuthenticationFilter.java:76` | `header.split(" ")[1]` |
-| Token extraction (Socket.IO) | `SocketIoConfig.extractToken()` — `SocketIoConfig.java:146` | Đọc `auth.token` (Map) hoặc chuỗi trần |
+| Token extraction (WebSocket) | `StompAuthChannelInterceptor.extractToken()` | Native header `Authorization: Bearer <t>` của frame CONNECT, fallback header `token` |
 | Claim → principal | `JwtService.toAccountId/asString/toRoles` — `:145`, `:149`, `:157` | Ép kiểu phòng thủ, không ném lỗi |
 
 **Không có JWT logic viết tay ở nơi nào khác:** `grep -rn "HmacSHA256" src/main/java` chỉ khớp
-`JwtService.java`. Hai điểm *verify* (HTTP filter và Socket.IO listener) đều đi qua đúng một method
-`parseAccessToken()` — đây là điểm mạnh của thiết kế hiện tại.
+`JwtService.java`. Hai điểm *verify* (HTTP filter và STOMP channel interceptor) đều đi qua đúng một
+method `parseAccessToken()` — đây là điểm mạnh của thiết kế hiện tại.
 
 ### 3.4 Validation: từng bước của `parse()`
 
@@ -299,19 +302,40 @@ trên route `@Auth(required=true)` chuỗi này lọt thẳng ra response body:
 
 ### 3.6 Refresh token
 
-`POST /v1/auth/refresh` (`AuthController.refresh`) nhận `{refreshToken}` và trả về **cặp token
-mới** `{id, accessToken, refreshToken}` — endpoint MỚI, bản TypeScript không có.
+`POST /v1/auth/refresh` (`AuthController.refresh`) đọc refresh token từ **cookie**, trả
+`{id, accessToken}` trong body và ghi refresh token mới trở lại cookie — endpoint MỚI, bản
+TypeScript không có. Client phải gọi với `credentials: 'include'`, không cần (và không thể) tự đọc
+refresh token.
 
 | Điểm | Hành vi | Vì sao |
 |---|---|---|
+| Nguồn token | Cookie `refreshToken` (`HttpOnly`), không nhận body | Đó là bản duy nhất client còn giữ sau khi đăng nhập; body sẽ kéo token trở lại tầm với của JavaScript |
+| Thiếu cookie | 401 `Refresh token không hợp lệ` | "Chưa đăng nhập" và "phiên đã chết" dẫn tới cùng một hành động phía client |
 | Khoá ký | `JwtService.parseRefreshToken()` dùng `refreshSecret` | Access token không dùng thay refresh token được, và ngược lại |
 | Nguồn roles | Đọc lại `accounts` + `account_role` từ DB | Ký lại payload cũ thì thu quyền phải chờ hết hạn refresh token (10h) mới có hiệu lực |
 | Tài khoản bị khoá | 401 (login là 400) | Client cần một mã khiến interceptor xoá phiên; đây cũng là cơ chế **thu hồi** duy nhất hiện có |
-| Refresh token trả về | Luôn là token MỚI (xoay vòng) | Phiên trượt theo hoạt động thay vì bị cắt cứng sau 10h |
+| Refresh token trả về | Luôn là token MỚI (xoay vòng), ghi vào cookie chứ không vào body | Phiên trượt theo hoạt động thay vì bị cắt cứng sau 10h |
 | Xác thực | Không mang `@Auth` | Người gọi tới đây chính vì access token của họ đã chết |
 
+**Cookie mang refresh token** (`RefreshTokenCookie`) — thuộc tính khai qua biến môi trường:
+
+| Thuộc tính | Giá trị | Ghi chú |
+|---|---|---|
+| `name` | `REFRESH_COOKIE_NAME` (mặc định `refreshToken`) | |
+| `Path` | `REFRESH_COOKIE_PATH` (mặc định `/`) | Đổi thành `/v1/auth/refresh` thì cookie chỉ đi kèm đúng endpoint cần nó, đổi lại là logout phải cùng path |
+| `HttpOnly` | luôn `true` | Lý do tồn tại của cả cơ chế: XSS không lấy được refresh token |
+| `Secure` | `REFRESH_COOKIE_SECURE` (mặc định `false`) | Dev chạy http nên `true` sẽ khiến trình duyệt bỏ cookie; prod bắt buộc `true` |
+| `SameSite` | `REFRESH_COOKIE_SAME_SITE` (mặc định `Lax`) | FE khác domain phải dùng `None`, và `None` **bắt buộc** đi kèm `Secure` |
+| `Max-Age` | `REFRESH_TOKEN_EXPIRES_IN` | Cookie sống đúng bằng token nó chứa |
+
+**CORS:** `WebConfig.addCorsMappings` chỉ bật `allowCredentials` khi `DOMAIN_CORS` liệt kê origin cụ
+thể. Để `*` thì trình duyệt không gửi cookie cross-origin — cố ý: bật credentials cùng origin `*`
+nghĩa là bất kỳ trang nào cũng gọi được `/v1/auth/refresh` bằng cookie của nạn nhân **và đọc được**
+access token trả về.
+
 **Còn thiếu:** không lưu trạng thái, nên refresh token cũ vẫn dùng được tới khi hết hạn (không phát
-hiện được tái sử dụng), và access token đã phát ra không thu hồi được trước hạn. Xem §18 `SEC-5`.
+hiện được tái sử dụng), và access token đã phát ra không thu hồi được trước hạn. Chưa có endpoint
+logout để xoá cookie (`RefreshTokenCookie.clear` đã sẵn sàng, chỉ thiếu route). Xem §18 `SEC-5`.
 
 Test: `AuthServiceRefreshTest` (nghiệp vụ), `AuthControllerRefreshTest` (định tuyến + validate).
 
@@ -534,11 +558,6 @@ Ký hiệu: `req` = `@Auth` (mặc định `required=true`) · `opt` = `@Auth(re
 | `/v1/posts/{postId}` (multipart/json) | PUT | req | `post:update:own` | `PostAccessGuard.requireOwnerToEdit` (**NO_BYPASS**) + kiểm lại trong `PostService.update` | `:107`, `:123` |
 | `/v1/posts/{id}` | DELETE | req | `post:delete:own` **hoặc** `post:delete` | `PostAccessGuard.requireOwnerToDelete` (bypass ADMIN) | `:135` |
 | `/v1/posts/like`, `/v1/posts/unlike` | POST | req | — | — | `:143`, `:150` |
-| `/v1/pets` | POST | req | `pet:create` | người tạo thành PRIMARY_OWNER, id lấy từ token | `PetController.java:46` |
-| `/v1/pets/me` | GET | req | — | ownerId lấy từ token, **không** nhận query param | `:62` |
-| `/v1/pets/{petId}` | GET | opt | — | `PetVisibilityFilter` | `:72` |
-| `/v1/pets/{petId}` | PUT | req | `pet:update:own` | `PetAccessGuard.requireOwnerToEdit` (**NO_BYPASS**) + kiểm lại trong `PetService.update` | `:78` |
-| `/v1/pets/{petId}` | DELETE | req | `pet:delete:own` | `PetAccessGuard.requireOwnerToArchive` (**NO_BYPASS**) + `PetService.archive` đòi đúng PRIMARY_OWNER | `:89` |
 | `/v1/comments` (multipart/json) | POST | req | `comment:create` | `postRepository.findVisibleById` trong service | `CommentController.java:35`, `:48` |
 | `/v1/comments/{postId}` | GET | opt | — | `PostVisibility` | `:68` |
 | `/v1/comments/{commentId}` | DELETE | req | `comment:delete:own` **hoặc** `post:delete` | `CommentAccessGuard` (bypass ADMIN) | `:75` |
@@ -560,7 +579,7 @@ Ký hiệu: `req` = `@Auth` (mặc định `required=true`) · `opt` = `@Auth(re
 | `/v1/messages/delivered` | PATCH | req | — | **không dùng guard**: lọc `receiver = token` ngay trong truy vấn, id lạ bị bỏ qua thay vì 403 cả lô | `MessageService.markDelivered` |
 | `/v1/messages/read` | PATCH | req | — | reader = token, đối phương = `?partnerId` | `MessageService.markConversationRead` |
 | `/v1/messages/unread-count` | GET | req | — | chỉ đếm tin của token | `MessageService.countUnread` |
-| socket `message delivered` / `message read` | — | req | — | danh tính từ `client.get("userId")`, **không từ payload** | `MessageSocketHandlers` |
+| `/app/message.delivered` · `/app/message.read` | STOMP SEND | req | — | danh tính từ `Principal` của phiên, **không từ payload**; client chỉ SEND được vào `/app/**` | `MessageStompController` |
 | `/v1/notifications` | POST | req | — | actor = token | `NotificationController.java:31` |
 | `/v1/notifications/{id}` | GET | req | — | **không có** (xem §18 `SEC-7`) | `:52` |
 | `/v1/notifications/me/{id}` | GET | req | — | `{id}` bị bỏ qua | `:59` |
@@ -610,8 +629,8 @@ ROLE_PERMISSIONS = Map.of(
 ```
 
 `resolvePermissions(List<String> roles)` (`:72-91`):
-1. Luôn nạp **toàn bộ 18 `BASELINE_PERMISSIONS`** (`:28-48`) cho mọi người gọi đã xác thực
-   (15 mã gốc + `pet:create`, `pet:update:own`, `pet:delete:own`).
+1. Luôn nạp **toàn bộ 15 `BASELINE_PERMISSIONS`** cho mọi người gọi đã xác thực
+   (15 mã, xem danh sách ngay trên).
 2. Với mỗi chuỗi role trong token: `RoleName.valueOf(role)`; **role lạ bị bỏ qua trong im lặng**
    (`:83-86`, có test `PermissionCatalogTest.role_la_khong_lam_mat_quyen_baseline`).
 3. Cộng thêm permission của role đó.

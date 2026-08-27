@@ -24,7 +24,6 @@ import com.nguyenvu.lopet.realtime.RealtimeGateway;
 import com.nguyenvu.lopet.security.Auth;
 import com.nguyenvu.lopet.security.CurrentUser;
 
-import com.nguyenvu.lopet.security.petcontext.RequireAnyPet;
 
 import lombok.RequiredArgsConstructor;
 
@@ -46,10 +45,6 @@ public class MessageController {
         return ApiResponse.ok("Get detail message successfully", messageService.getDetail(id));
     }
 
-    /**
-     * Giữ nguyên đường dẫn và hình dạng response của bản cũ, nhưng nay chỉ NGƯỜI NHẬN gọi được và
-     * trạng thái không lùi được — luật nằm trong {@link MessageService#changeStatus}.
-     */
     @PatchMapping("/status/{id}")
     @Auth
     public ApiResponse<MessageDtos.ChangeStatusResponse> updateStatus(
@@ -74,7 +69,7 @@ public class MessageController {
     public ApiResponse<MessageDtos.MarkStatusResponse> markDelivered(
             @RequestBody MessageDtos.DeliveredAckRequest request) {
         MessageDtos.StatusUpdateResult result =
-                messageService.markDelivered(CurrentUser.require().id(), request.getMessageIds());
+                messageService.markDelivered(CurrentUser.require().id(), request.messageIds());
         messageStatusNotifier.broadcast(result);
         return ApiResponse.ok("Mark messages delivered successfully",
                 new MessageDtos.MarkStatusResponse(result.count(), MessageStatus.DELIVERED));
@@ -130,7 +125,6 @@ public class MessageController {
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
     @Auth
-    @RequireAnyPet
     public ApiResponse<MessageDtos.CreateMessageResponse> create(
             @RequestParam(required = false) String content,
             @RequestParam String receiverId,
@@ -139,23 +133,15 @@ public class MessageController {
         return send(content, receiverId, imageUrl);
     }
 
-    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
-    @ResponseStatus(HttpStatus.CREATED)
-    @Auth
-    @RequireAnyPet
-    public ApiResponse<MessageDtos.CreateMessageResponse> createJson(
-            @RequestBody MessageDtos.CreateMessageRequest request) {
-        return send(request.content(), request.receiverId(), "");
-    }
-
     private ApiResponse<MessageDtos.CreateMessageResponse> send(String content, String receiverId,
                                                                  String imageUrl) {
         String senderId = String.valueOf(CurrentUser.require().id());
         MessageDtos.CreateMessageResponse response = messageService.create(senderId, receiverId,
                 content == null ? "" : content, imageUrl);
 
-        // Đẩy tới phòng riêng của người nhận — tên sự kiện giữ nguyên lỗi chính tả của bản gốc
-        realtimeGateway.emit(RealtimeGateway.userRoom(receiverId), RealtimeGateway.EVENT_CHAT_MESSAGE,
+        // Đẩy tới destination riêng của người nhận; chỉ chính chủ subscribe được vào đó
+        realtimeGateway.emit(
+                RealtimeGateway.userTopic(receiverId, RealtimeGateway.CHANNEL_CHAT),
                 new MessageDtos.ChatMessageEvent(response, senderId));
 
         return ApiResponse.created("Create message successfully", response);

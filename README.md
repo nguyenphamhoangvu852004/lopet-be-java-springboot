@@ -2,8 +2,9 @@
 
 Bản migrate Java/Spring Boot của [`lopet-be`](../lopet-be) (TypeScript + ExpressJS + TypeORM).
 
-Mục tiêu: **thay thế trực tiếp** backend cũ — dùng lại đúng database, đúng file `.env`, và không
-buộc frontend sửa gì ngoài URL của Socket.IO (xem [Khác biệt duy nhất](#khác-biệt-duy-nhất-với-bản-cũ)).
+Mục tiêu: **thay thế trực tiếp** backend cũ — dùng lại đúng database và đúng file `.env`. Ngoại lệ
+duy nhất là tầng realtime: nó đã chuyển sang STOMP over WebSocket, nên frontend phải viết lại phần
+đó (xem [Khác biệt duy nhất](#khác-biệt-duy-nhất-với-bản-cũ)).
 
 `lopet-be` là **source of truth**. Ở đâu hành vi của nó khác với best practice hay khác với cách một
 mạng xã hội "nên" hoạt động, bản Java giữ theo `lopet-be`.
@@ -15,7 +16,7 @@ mạng xã hội "nên" hoạt động, bản Java giữ theo `lopet-be`.
 | Hạng mục | Kết quả |
 |---|---|
 | Endpoint | 72/72 đường dẫn, 0 thiếu |
-| Sự kiện Socket.IO | 7/7 |
+| Destination realtime | 8/8 |
 | Schema database | 145/145 cột và 27/27 khoá ngoại **trùng khớp** với schema do TypeORM sinh ra |
 | Test | 71 test, pass 100% |
 
@@ -33,76 +34,121 @@ Chi tiết đối chiếu: [`docs/MIGRATION_FINAL_REPORT.md`](docs/MIGRATION_FIN
 | Auth | jsonwebtoken | JWT HS256 tự hiện thực (lý do ở báo cáo §4.3) + Spring Security |
 | Hash | bcryptjs cost 10 | `BCryptPasswordEncoder(10)` — hash cũ dùng lại được |
 | Validation | Joi | Bean Validation, giữ nguyên văn thông điệp lỗi |
-| Realtime | socket.io 4 | netty-socketio (cùng protocol EIO4) |
+| Realtime | socket.io 4 | STOMP over WebSocket (`spring-boot-starter-websocket`) |
 | Upload | multer + Cloudinary | `MultipartFile` + Cloudinary SDK |
 | Test | Jest + supertest | JUnit 5 + Mockito + MySQL thật |
 
 ## Chạy dự án
 
-### 1. Hạ tầng
+Hai môi trường, mỗi môi trường một file compose và một file `.env`. Khác biệt nằm hoàn toàn ở cấu
+hình — cùng một image được kiểm ở dev rồi đẩy lên prod.
 
-Dùng lại `docker-compose.yaml` của `lopet-be` (MySQL cổng 3307, Redis 6379):
+| | Dev | Production |
+|---|---|---|
+| Compose | `docker-compose-dev.yml` | `docker-compose.yml` |
+| Env | `.env.dev` | `.env.prod` |
+| Spring profile | `dev` | `prod` |
+| MySQL / Redis | container, publish 3307 / 6379 ra host | container, **không** publish cổng nào |
+| Vào từ ngoài | `localhost:8080` (REST + WebSocket `/ws`) | `https://api.nguyenvu.io.vn` qua nginx |
+| `ddl-auto` | `update` | `${JPA_DDL_AUTO:update}` — xem cảnh báo trong `application-prod.yml` |
+| Dữ liệu demo | có (`SEED_DEMO=true`) | không, cứng |
+| Log | `debug` cho package app | `warn` root / `info` app |
+| CORS | `*` | danh sách origin cụ thể |
+| Actuator | mở rộng, health chi tiết | `health,info,metrics`, nginx chặn `/actuator/` từ ngoài |
 
-```bash
-cd ../lopet-be && docker compose up -d mysql-docker redis
-```
-
-### 2. Chạy backend
-
-```bash
-mvn package -DskipTests
-java -jar target/lopet-0.0.1-SNAPSHOT.jar
-```
-
-Biến môi trường trùng tên với `example.env` của `lopet-be`, nên `.env` cũ dùng lại được:
-
-```bash
-DATABASE_HOSTNAME=127.0.0.1 DATABASE_PORT=3307 DATABASE_USERNAME=root \
-DATABASE_PASSWORD=nguyenvu DATABASE_NAME=socialmedia \
-REDIS_HOSTNAME=127.0.0.1 REDIS_PORT=6379 \
-APP_PORT=8080 SOCKET_PORT=8081 \
-ACCESS_TOKEN_SECRET=... REFRESH_TOKEN_SECRET=... \
-CLOUDINARY_CLOUD_NAME=... CLOUDINARY_API_KEY=... CLOUDINARY_API_SECRET=... \
-RESEND_API_KEY=re_... MAIL_FROM='Lopet <no-reply@domain-da-verify>' \
-INIT_ADMIN_EMAIL=... INIT_ADMIN_USERNAME=... INIT_ADMIN_PASSWORD=... \
-java -jar target/lopet-0.0.1-SNAPSHOT.jar
-```
-
-Biến mới: **`SOCKET_PORT`**, **`RESEND_API_KEY`**, **`MAIL_FROM`**. Ba biến SMTP cũ
-(`MAIL_HOST`/`MAIL_PORT`/`MAIL_USER`/`MAIL_PASS`) không còn được đọc — mail đi qua HTTP API của
-[Resend](https://resend.com) vì Render chặn cổng SMTP ra ngoài.
-
-Chạy ở chế độ dev:
+### Dev
 
 ```bash
-mvn spring-boot:run       # đúng cú pháp: có dấu hai chấm, KHÔNG phải `mvn springboot-run`
+cp .env.example .env.dev          # rồi điền giá trị
+docker compose --env-file .env.dev -f docker-compose-dev.yml up -d --build
 ```
+
+`--env-file` là **bắt buộc**, không phải tuỳ chọn. `env_file:` trong compose chỉ bơm biến vào *bên
+trong* container, còn `${VAR}` viết ở thân file compose (mật khẩu MySQL) được thay lúc compose đọc
+file — hai cơ chế khác nhau. Thiếu nó, compose dừng ngay với thông báo tên biến còn thiếu.
+
+```bash
+docker compose --env-file .env.dev -f docker-compose-dev.yml logs -f lopet-backend
+docker compose --env-file .env.dev -f docker-compose-dev.yml down          # giữ dữ liệu
+docker compose --env-file .env.dev -f docker-compose-dev.yml down -v       # xoá luôn volume
+```
+
+Kiểm tra nhanh:
+
+```bash
+curl -s localhost:8080/actuator/health
+curl -i -N -H "Connection: Upgrade" -H "Upgrade: websocket"      -H "Sec-WebSocket-Version: 13" -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ=="      http://localhost:8080/ws                       # phải trả 101 Switching Protocols
+```
+
+### Chạy backend ngoài Docker
+
+Vẫn dùng được khi cần debug từ IDE — chỉ dựng hạ tầng rồi trỏ app vào cổng đã publish:
+
+```bash
+docker compose --env-file .env.dev -f docker-compose-dev.yml up -d lopet-mysql lopet-redis
+DATABASE_HOSTNAME=127.0.0.1 DATABASE_PORT=3307 REDIS_HOSTNAME=127.0.0.1 ./mvnw spring-boot:run
+```
+
+Hoặc copy `.env.dev` thành `.env` (đổi hai host thành `127.0.0.1`, `DATABASE_PORT=3307`) —
+`application.yml` khai `spring.config.import: optional:file:.env[.properties]` nên nó được nạp tự
+động.
+
+### Production
+
+Lần đầu trên VPS, sau khi DNS của `API_DOMAIN` đã trỏ về máy:
+
+```bash
+./scripts/init-letsencrypt.sh --staging    # thử trước, không tính vào rate limit
+./scripts/init-letsencrypt.sh              # chứng chỉ thật
+docker compose --env-file .env.prod -f docker-compose.yml up -d --build
+```
+
+`init-letsencrypt.sh` tồn tại để gỡ thế kẹt: nginx từ chối khởi động khi `ssl_certificate` trỏ vào
+file chưa có, còn certbot lại cần nginx đang chạy để phục vụ ACME challenge. Script dựng một chứng
+chỉ tự ký giả cho nginx lên được, lấy chứng chỉ thật đè lên, rồi reload. Sau lần đó service
+`lopet-certbot` tự gia hạn mỗi 12h và `lopet-nginx` tự reload mỗi 6h để nạp cert mới.
+
+Deploy phiên bản mới:
+
+```bash
+git pull
+docker compose --env-file .env.prod -f docker-compose.yml up -d --build lopet-backend
+docker compose --env-file .env.prod -f docker-compose.yml exec lopet-nginx nginx -s reload
+```
+
+Dòng `nginx -s reload` là **bắt buộc** sau khi dựng lại backend: nginx phân giải hostname của
+upstream một lần lúc nạp cấu hình rồi nhớ địa chỉ IP đó. Container backend mới có IP mới, nên
+không reload thì mọi request đi vào một IP đã chết cho tới lần reload định kỳ 6h sau.
 
 ### Lỗi hay gặp
 
 | Triệu chứng | Nguyên nhân | Cách sửa |
 |---|---|---|
-| `Unknown lifecycle phase "springboot-run"` | sai tên goal | dùng `mvn spring-boot:run` (gạch nối + dấu hai chấm) |
-| `Web server failed to start. Port 8080 was already in use` | còn tiến trình cũ giữ cổng | đổi `APP_PORT`, hoặc tắt tiến trình đang chiếm cổng |
-| `Không mở được Socket.IO trên cổng 8081` | cổng realtime bị chiếm | đổi `SOCKET_PORT`, hoặc `SOCKET_PORT=0` để tắt realtime |
-| `Communications link failure` lúc khởi động | không có MySQL ở `DATABASE_HOSTNAME:DATABASE_PORT` | mặc định là `localhost:3306`; MySQL của docker-compose nằm ở cổng **3307** |
+| `required variable DATABASE_PASSWORD is missing a value` | quên `--env-file` | thêm `--env-file .env.dev` (hoặc `.env.prod`) |
+| `env file .env.prod not found` | chưa tạo file env cho môi trường đó | `cp .env.example .env.prod` rồi điền |
+| `Bind for 0.0.0.0:6379 failed: port is already allocated` | còn container cũ giữ cổng | `docker ps` rồi dừng nó, hoặc đổi `HOST_REDIS_PORT` trong `.env.dev` |
+| `Communications link failure` lúc khởi động | app lên trước khi MySQL nhận kết nối | đã xử lý bằng `depends_on: condition: service_healthy`; nếu chạy app ngoài Docker thì đợi `docker compose ps` báo mysql `healthy` |
+| 413 khi upload ảnh/video | `client_max_body_size` của nginx nhỏ hơn `MAX_REQUEST_SIZE` | hai giá trị phải đi cùng nhau — xem `nginx/conf.d/lopet.conf` |
+| WebSocket không bắt tay được qua nginx | `location /ws` nằm sau `location /`, mà khối đó đặt `Connection ""` cho keepalive | giữ `location /ws` **trước** `location /` như trong `nginx/conf.d/lopet.conf` |
 | `Referencing column ... are incompatible` | database đang trỏ tới có schema lẫn lộn từ lần chạy sai cấu hình cũ | xem `docs/MIGRATION_FINAL_REPORT.md` §6 |
 
-### 3. Test
+### Test
 
 ```bash
-mvn test          # cần MySQL ở cổng 3307; hai bộ integration tự tạo database riêng
+docker compose --env-file .env.dev -f docker-compose-dev.yml up -d lopet-mysql
+./mvnw test          # cần MySQL ở cổng 3307; các bộ integration tự tạo database riêng
 ```
 
 ## Profile cấu hình
 
-| Profile | ddl-auto | Dùng khi |
-|---|---|---|
-| `dev` (mặc định) | `update` | máy cá nhân — giống `synchronize: true` của TypeORM |
-| `test` | `create-drop` | `mvn test`, database riêng, không đụng dev |
-| `prod` | `validate` | chỉ kiểm tra entity khớp bảng thật, không tự sửa schema |
+| Profile | File | ddl-auto | Dùng khi |
+|---|---|---|---|
+| `dev` (mặc định) | `application-dev.yml` | `update` | máy cá nhân — giống `synchronize: true` của TypeORM |
+| `test` | `src/test/resources/application-test.yml` | `update`, database riêng mỗi test class | `./mvnw test` |
+| `prod` | `application-prod.yml` | `${JPA_DDL_AUTO:update}` | VPS |
 
-Không hard-code bí mật ở bất kỳ đâu; tất cả đọc từ biến môi trường.
+`application.yml` giữ phần dùng chung và mọi biến môi trường; hai file profile chỉ chứa thứ *khác
+nhau* giữa hai môi trường. Không hard-code bí mật ở bất kỳ đâu.
 
 ## Cấu trúc
 
@@ -112,7 +158,7 @@ com.nguyenvu.lopet
 ├── bootstrap/     AuthorizationSeeder, AdminInitializer, StartupRunner
 ├── common/        response envelope, exception + handler tập trung, media
 ├── security/      JWT, @Auth, @RequirePermission, PermissionCatalog, OwnershipGuard
-├── realtime/      Socket.IO server + gateway phát sự kiện
+├── realtime/      WebSocket/STOMP: endpoint /ws, xác thực frame CONNECT, gateway phát sự kiện
 └── <module>/      account, auth, role, email, profile, group, post, comment,
                    friendship, message, notification, report, advertisement, advertiser
                    (mỗi module: controller / service / repository / entity / dto)
@@ -127,80 +173,84 @@ Bốn tầng phân quyền độc lập, đúng như bản Express:
 
 ## Khác biệt duy nhất với bản cũ
 
-Express gắn Socket.IO vào chính HTTP server nên dùng chung cổng 8080. Ở Java, Tomcat sở hữu cổng
-HTTP nên Socket.IO phải nghe cổng riêng (`SOCKET_PORT`, mặc định 8081). Chạy trực tiếp bằng
-`java -jar`, client sửa một dòng:
+Tầng realtime chuyển từ Socket.IO sang **STOMP over WebSocket**, endpoint `/ws` trên chính cổng REST.
+Đây là khác biệt duy nhất buộc frontend phải sửa code, và nó là breaking: `socket.io-client` không
+nói được STOMP nên không có đường giữ nguyên client cũ.
 
 ```js
 // trước
-const socket = io("http://localhost:8080", { auth: { token } })
-// sau
 const socket = io("http://localhost:8081", { auth: { token } })
+socket.on("chat messsage", handler)
+
+// sau
+const client = new Client({
+  brokerURL: "ws://localhost:8080/ws",
+  connectHeaders: { Authorization: `Bearer ${token}` },
+})
+client.onConnect = () => client.subscribe(`/topic/user.${myId}/chat`, handler)
+client.activate()
 ```
 
-**Chạy bằng Docker thì khác biệt này biến mất**: image có sẵn nginx gộp hai cổng về một origin,
-`/socket.io/` và REST API dùng chung URL đúng như bản Express — xem [Deploy](#deploy-render).
+Bù lại, cổng 8081 biến mất hoàn toàn: dev lẫn prod đều chỉ còn một cổng, và `/ws` dùng chung origin
+với REST đúng như bản Express từng làm với `/socket.io/`.
 
-## Deploy (Render)
+Bảng ánh xạ đầy đủ 7 sự kiện cũ → destination mới, thông điệp lỗi và snippet client:
+[`docs/REALTIME_WEBSOCKET_MIGRATION.md`](docs/REALTIME_WEBSOCKET_MIGRATION.md).
 
-Render chỉ mở **một** cổng công khai cho mỗi service, lấy từ biến `$PORT` do nó tự cấp lúc chạy.
-JVM này lại mở hai — Tomcat và netty-socketio — nên nếu để trần, Render chỉ định tuyến tới một
-trong hai và `wss://.../socket.io/` không bao giờ bắt tay được. Image giải quyết bằng một lớp
-nginx đứng trước:
+## Deploy
+
+Kiến trúc production: chỉ nginx publish cổng, ba service còn lại sống trong network nội bộ.
 
 ```
-Render ──$PORT──▶ nginx ──┬── /socket.io/ ──▶ 127.0.0.1:8081  netty-socketio
-                          └── /           ──▶ 127.0.0.1:8080  Tomcat (REST)
+Internet ──80/443──▶ lopet-nginx ──┬── /ws ──▶ lopet-backend:8080  STOMP over WebSocket
+                                   └── /   ──▶ lopet-backend:8080  Tomcat (REST)
+
+                     lopet-backend ──┬──▶ lopet-mysql:3306
+                                     └──▶ lopet-redis:6379   (requirepass)
 ```
 
 | File | Vai trò |
 |---|---|
-| [`docker/nginx.conf.template`](docker/nginx.conf.template) | cấu hình proxy; `${PORT}` và hai cổng upstream được `envsubst` bơm vào lúc container khởi động |
-| [`docker/entrypoint.sh`](docker/entrypoint.sh) | sinh cấu hình → **chờ 8080/8081 mở** → bật nginx → `exec java` (JVM giữ PID 1 để nhận SIGTERM) |
+| [`docker-compose.yml`](docker-compose.yml) | 5 service: mysql, redis, backend, nginx, certbot |
+| [`nginx/conf.d/lopet.conf`](nginx/conf.d/lopet.conf) | reverse proxy, TLS, `client_max_body_size`, nâng cấp WebSocket |
+| [`scripts/init-letsencrypt.sh`](scripts/init-letsencrypt.sh) | xin chứng chỉ TLS lần đầu |
+| [`Dockerfile`](Dockerfile) | image dùng chung cho cả hai môi trường |
 
-Chi tiết dễ bỏ sót: nginx chỉ mở cổng công khai **sau khi** Tomcat và Socket.IO đã nghe. Spring
-mất ~30s để lên; bật nginx ngay từ giây đầu thì `$PORT` mở trong khi phía sau chưa có ai, Render
-tưởng deploy xong và cho traffic vào, health check đập trúng 502 và deploy bị đánh trượt. Chờ
-xong mới mở giữ đúng ngữ nghĩa của bản chưa có proxy: **cổng mở nghĩa là app sẵn sàng**.
+Vài điểm được xử lý sẵn, dễ bỏ sót nếu dựng lại từ đầu:
 
-Kèm theo: 502 do nginx sinh ra không có header CORS, nên trình duyệt hiển thị nó thành
-`No 'Access-Control-Allow-Origin' header is present` — một thông báo trỏ sai hoàn toàn hướng.
-Gặp lỗi CORS lạ thì kiểm tra bằng `curl -i` trước, xem mã trả về thật là gì.
+- **`depends_on: condition: service_healthy`** — MySQL cần thêm ~20s sau khi container được tạo mới
+  nhận kết nối. `depends_on` trần chỉ đợi container tồn tại, nên backend lên trước và chết với
+  `Communications link failure`.
+- **`client_max_body_size 500m`** — mặc định của nginx là 1MB; thiếu dòng này thì mọi upload chết ở
+  tầng proxy với 413 dù `MAX_REQUEST_SIZE` của app đã là 500MB.
+- **`location /ws` đứng trước `location /`** — khối `location /` đặt `Connection ""` để keepalive
+  tới upstream hoạt động; một handshake rơi vào đó thì không bao giờ nâng cấp lên WebSocket được.
+- **`server.forward-headers-strategy: framework`** — thiếu nó, mọi URL Spring tự sinh mang scheme
+  `http` và cổng nội bộ 8080 thay vì domain thật.
+- **Vòng gia hạn của certbot + reload của nginx** — certbot gia hạn thành công nhưng nginx giữ cert
+  cũ trong bộ nhớ cho tới lần restart tay, nên site vẫn chết đúng ngày cert hết hạn.
 
-Frontend dùng đúng một origin cho cả hai:
+Frontend dùng đúng một origin cho cả REST lẫn realtime:
 
 ```js
-const socket = io("https://<service>.onrender.com", { auth: { token } })
+const client = new Client({
+  brokerURL: "wss://api.nguyenvu.io.vn/ws",
+  connectHeaders: { Authorization: `Bearer ${token}` },
+})
 ```
 
-### ⚠️ Biến môi trường cần **xoá** khỏi Render Environment
-
-`APP_PORT`, `SOCKET_PORT`, `SOCKET_HOSTNAME` — nếu còn sót lại từ lần deploy trước thì xoá đi.
-Hai cổng nội bộ 8080/8081 giờ cố định trong `docker/entrypoint.sh` và truyền bằng tham số dòng
-lệnh (`--server.port`, `--lopet.socket.port`), thứ có precedence cao nhất trong Spring — các biến
-đó có tồn tại cũng không còn tác dụng, chỉ gây hiểu nhầm là còn chỉnh được. Cổng duy nhất còn ý
-nghĩa là `$PORT`, và **Render tự cấp**, đừng tự khai.
-
-### Build và test tại máy
+### Kiểm tra sau khi deploy
 
 ```bash
-docker build -t lopet-be .
-docker run --rm -p 3000:3000 -e PORT=3000 --env-file .env lopet-be
+docker compose --env-file .env.prod -f docker-compose.yml ps      # mọi service phải healthy
+curl -i https://api.nguyenvu.io.vn/api/v1/roles                   # REST qua nginx
+curl -i https://api.nguyenvu.io.vn/actuator/health                # phải trả 404 (nginx chặn)
+curl -i -N -H "Connection: Upgrade" -H "Upgrade: websocket"      -H "Sec-WebSocket-Version: 13" -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ=="      https://api.nguyenvu.io.vn/ws
 ```
 
-`PORT` phải trùng cổng bên trong của `-p`. Đặt `PORT=8080` hay `8081` vẫn chạy được: entrypoint
-thấy trùng cổng nội bộ thì dời upstream sang 18080/18081, vì thứ bắt buộc phải nghe đúng `$PORT`
-chỉ có nginx. Kiểm tra cả hai đường:
+Bắt tay trả `101 Switching Protocols` là nginx đã định tuyến và nâng cấp đúng.
 
-```bash
-curl -i http://localhost:3000/api/v1/roles                  # REST qua nginx
-curl -i "http://localhost:3000/socket.io/?EIO=4&transport=polling"   # handshake Socket.IO
-```
-
-Handshake trả `0{"sid":"...","upgrades":["websocket"],...}` là nginx đã định tuyến đúng sang
-netty-socketio.
-
-Các khác biệt còn lại (thông điệp lỗi handshake socket, số phần tử trong mảng `errors` của
+Các khác biệt còn lại (thông điệp lỗi bắt tay realtime, số phần tử trong mảng `errors` của
 validation, ranh giới transaction) đều được liệt kê ở
 [`docs/MIGRATION_FINAL_REPORT.md`](docs/MIGRATION_FINAL_REPORT.md) §4.
 
@@ -213,3 +263,4 @@ validation, ranh giới transaction) đều được liệt kê ở
 | [`docs/MIGRATION_FEATURE_MATRIX.md`](docs/MIGRATION_FEATURE_MATRIX.md) | 33 module/feature kèm business rule chi tiết |
 | [`docs/DATABASE_MIGRATION_NOTES.md`](docs/DATABASE_MIGRATION_NOTES.md) | 18 bảng, chỗ không map 1:1 được, kết quả so schema |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Kiến trúc, ánh xạ middleware → Spring, transaction, hiệu năng |
+| [`docs/REALTIME_WEBSOCKET_MIGRATION.md`](docs/REALTIME_WEBSOCKET_MIGRATION.md) | **Cho frontend**: Socket.IO → STOMP, bảng ánh xạ destination, snippet client |

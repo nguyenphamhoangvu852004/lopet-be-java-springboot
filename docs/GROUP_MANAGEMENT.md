@@ -11,7 +11,7 @@ thành viên quanh nó thì không tồn tại:
 - không có endpoint nào để **rời nhóm** — chỉ quản trị nhóm xoá được người khác;
 - `group_members` **không có cột trạng thái**, nên một yêu cầu chờ duyệt hay một lời mời chưa trả lời
   là thứ không diễn tả được;
-- `GET /v1/groups/{id}` không xác thực và trả nguyên `members[]`, nên handle + ảnh của từng thú cưng
+- `GET /v1/groups/{id}` không xác thực và trả nguyên `members[]`, nên hồ sơ của từng thành viên
   trong **mọi nhóm kín** đọc được chỉ bằng cách đoán id nhóm.
 
 ---
@@ -23,7 +23,7 @@ thành viên quanh nó thì không tồn tại:
 | **PUBLIC** | mọi người, kể cả khách | thành viên ACTIVE | tự do, vào ngay | tự do |
 | **PRIVATE** | chỉ thành viên ACTIVE | thành viên ACTIVE | gửi yêu cầu → OWNER/ADMIN duyệt | tự do |
 
-Không phụ thuộc loại nhóm: **mọi thành viên ACTIVE đều mời được** người khác, và **chính pet được
+Không phụ thuộc loại nhóm: **mọi thành viên ACTIVE đều mời được** người khác, và **chính người được
 mời** chấp nhận hoặc từ chối.
 
 ### Đăng bài đòi tham gia ở CẢ HAI loại nhóm
@@ -44,7 +44,7 @@ nhóm kín còn **tìm được** mà xin vào; che hẳn thì không có đư�
 
 ## 2. Mô hình dữ liệu
 
-`group_members` giữ nguyên khoá chính ghép `(group_id, pet_id)` và nhận thêm hai cột:
+`group_members` giữ khoá chính ghép `(group_id, account_id)` và nhận thêm hai cột:
 
 ```
 status      enum('PENDING','ACTIVE') NOT NULL DEFAULT 'ACTIVE'
@@ -55,8 +55,8 @@ invited_by  int NULL                 -- KHÔNG có khoá ngoại, xem §2.2
 
 ```
 status = ACTIVE                       -> thành viên thật
-status = PENDING, invited_by IS NULL  -> pet TỰ xin vào nhóm PRIVATE   -> quản trị nhóm duyệt
-status = PENDING, invited_by NOT NULL -> được thành viên mời           -> CHÍNH PET ĐƯỢC MỜI duyệt
+status = PENDING, invited_by IS NULL  -> TỰ xin vào nhóm PRIVATE       -> quản trị nhóm duyệt
+status = PENDING, invited_by NOT NULL -> được thành viên mời           -> CHÍNH NGƯỜI ĐƯỢC MỜI duyệt
 ```
 
 Chọn một cột thay vì thêm giá trị enum thứ ba (`INVITED`) vì "ai được quyền trả lời hàng này" là
@@ -64,20 +64,20 @@ thông tin **suy ra được từ dữ liệu**, không cần thêm cờ. Hệ q
 `invited_by is null` nên quản trị nhóm **không** tự duyệt được một lời mời mà người được mời chưa
 đồng ý, và `respondToInvite` lọc `invited_by is not null` nên không ai tự chấp nhận hộ một yêu cầu.
 
-Không có `REJECTED`: từ chối thì **xoá hàng**, đúng như rời nhóm. Nhờ vậy pet bị từ chối xin lại
-được, pet từ chối lời mời được mời lại, và mọi truy vấn chỉ phải phân biệt hai trạng thái.
+Không có `REJECTED`: từ chối thì **xoá hàng**, đúng như rời nhóm. Nhờ vậy người bị từ chối xin lại
+được, người từ chối lời mời được mời lại, và mọi truy vấn chỉ phải phân biệt hai trạng thái.
 
 ### 2.2 Vì sao `invited_by` không có khoá ngoại
 
 Cùng lý do như `notifications.objectId`. Hai lựa chọn còn lại đều sai:
 
-- `ON DELETE SET NULL` — xoá pet đã mời sẽ biến một **lời mời** thành một **yêu cầu xin vào**, và
+- `ON DELETE SET NULL` — xoá người đã mời sẽ biến một **lời mời** thành một **yêu cầu xin vào**, và
   quản trị nhóm duyệt được một hàng mà người bị mời chưa hề đồng ý. Đúng cái lệch nghĩa mà §2.1 dựa
   vào để phân quyền.
-- `ON DELETE CASCADE` — xoá pet đã mời sẽ xoá cả những hàng **đã thành ACTIVE**, tức là đá một thành
+- `ON DELETE CASCADE` — xoá người đã mời sẽ xoá cả những hàng **đã thành ACTIVE**, tức là đá một thành
   viên thật ra khỏi nhóm chỉ vì người từng mời họ bị xoá.
 
-Đổi lại, giá trị có thể trỏ tới một pet không còn tồn tại; `listMyInvites` trả object rỗng cho
+Đổi lại, giá trị có thể trỏ tới một tài khoản không còn tồn tại; `listMyInvites` trả object rỗng cho
 `invitedBy` trong trường hợp đó.
 
 ### 2.3 `joined_at` vs `createdAt`
@@ -87,17 +87,12 @@ duyệt hoặc được chấp nhận. Lúc gửi yêu cầu / lúc được m�
 
 ---
 
-## 3. Thành viên là THÚ CƯNG
+## 3. Thành viên là TÀI KHOẢN
 
-Khoá chính là `(group_id, pet_id)`, nên mọi endpoint ghi lấy chủ thể từ `PetContext.require()` và
-**không bao giờ** từ id tài khoản trong token. Hệ quả có chủ đích: một người có hai thú cưng, đưa con
-A làm chủ nhóm, thì khi đang thao tác nhân danh con B họ **không** quản trị được nhóm đó.
-
-Ngoại lệ là hai route liệt kê theo tài khoản (`/owned/:id`, `/joined/:id`) — chúng gộp mọi thú cưng
-của tài khoản, vì đó là câu hỏi mà màn hình "nhóm của tôi" thật sự đang hỏi.
-
-Người nhận **thông báo** thì vẫn là **tài khoản** (`pet.getAccount().getId()`): đồ thị notification ở
-lại phạm vi tài khoản vĩnh viễn.
+Khoá chính là `(group_id, account_id)`, và mọi endpoint ghi lấy chủ thể từ `CurrentUser.require()` —
+**không bao giờ** từ body hay path param. Cùng một loại danh tính trả lời cả hai câu hỏi "ai đăng bài
+trong nhóm" và "ai là thành viên nhóm", nên mọi truy vấn phân quyền chỉ cần mang theo một tham số
+người xem.
 
 ---
 
@@ -128,10 +123,10 @@ tả được "là thành viên của đúng nhóm này", nên luật thật n�
 | Method | Path | Ghi chú |
 |---|---|---|
 | POST | `/v1/groups/{id}/join` | PUBLIC → ACTIVE ngay; PRIVATE → PENDING. Đọc `status` trong phản hồi. 201 |
-| DELETE | `/v1/groups/{id}/join` | huỷ yêu cầu do chính pet gửi |
+| DELETE | `/v1/groups/{id}/join` | huỷ yêu cầu do chính mình gửi |
 | DELETE | `/v1/groups/{id}/leave` | OWNER → 400 |
 | POST | `/v1/groups/invites` | body `{groupId, invitee}` — **nay tạo lời mời PENDING**, không thêm thẳng. 201 |
-| GET | `/v1/groups/invites/mine` | hộp thư lời mời của pet đang thao tác |
+| GET | `/v1/groups/invites/mine` | hộp thư lời mời của tài khoản đang đăng nhập |
 | POST | `/v1/groups/invites/accept` \| `/reject` | body `{groupId}` |
 
 ### Quản trị nhóm — `@Auth @RequirePermission("group:update:own") @RequirePet`
@@ -139,12 +134,12 @@ tả được "là thành viên của đúng nhóm này", nên luật thật n�
 | Method | Path | Ghi chú |
 |---|---|---|
 | GET | `/v1/groups/{id}/requests` | chỉ yêu cầu tự gửi, không lẫn lời mời |
-| POST | `/v1/groups/requests/approve` \| `/reject` | body `{groupId, petId}` |
+| POST | `/v1/groups/requests/approve` \| `/reject` | body `{groupId, accountId}` |
 
 ### Đọc
 
-`GET /v1/groups/{id}` nay có `@Auth(required = false)` + `PetContext.optional()`. Không gắn
-`@RequirePet`: bắt buộc header `X-Pet-Id` ở một route đọc công khai sẽ chặn luôn khách.
+`GET /v1/groups/{id}` nay có `@Auth(required = false)` + `CurrentUser.viewerId()`: khách vãng lai vẫn
+đọc được metadata, người đã đăng nhập thì thấy thêm danh sách thành viên nếu họ ở trong nhóm.
 
 ```json
 {
@@ -160,11 +155,11 @@ tả được "là thành viên của đúng nhóm này", nên luật thật n�
 `restricted` chứ không suy ra từ `members.isEmpty()` — một nhóm PUBLIC rỗng cũng cho danh sách rỗng.
 
 `viewerStatus` ∈ `NONE | PENDING_REQUEST | PENDING_INVITE | MEMBER`, là thứ quyết định nút hiển thị
-là *Tham gia* / *Đã gửi yêu cầu* / *Rời nhóm*. Khách chưa đăng nhập và người chưa chọn pet đều nhận
-`NONE` — cả ba trường hợp đều "chưa dính gì tới nhóm này".
+là *Tham gia* / *Đã gửi yêu cầu* / *Rời nhóm*. Khách chưa đăng nhập nhận `NONE` — "chưa dính gì tới
+nhóm này".
 
-Các route liệt kê (`/suggest`, `/owned/:id`, `/joined/:id`, `/joined/pets/:id`) giữ nguyên: không xác
-thực, và chỉ đếm/liệt kê hàng ACTIVE.
+Các route liệt kê (`/suggest`, `/owned/:id`, `/joined/:id`) giữ nguyên: không xác thực, và chỉ
+đếm/liệt kê hàng ACTIVE.
 
 ---
 
@@ -212,9 +207,9 @@ Bốn loại mới trong `NotificationObjectType`, `objectId` của cả bốn l
 | Loại | Người nhận |
 |---|---|
 | `GROUP_JOIN_REQUESTED` | từng quản trị nhóm (một bản ghi mỗi người — bảng là quan hệ một-người-nhận) |
-| `GROUP_JOIN_APPROVED` | chủ của pet đã xin vào |
-| `GROUP_INVITED` | chủ của pet được mời |
-| `GROUP_INVITE_ACCEPTED` | chủ của pet đã mời |
+| `GROUP_JOIN_APPROVED` | người đã xin vào |
+| `GROUP_INVITED` | người được mời |
+| `GROUP_INVITE_ACCEPTED` | người đã mời |
 
 Từ chối **không** sinh thông báo, khớp cách `FriendshipService.changeStatus` chỉ báo khi `ACCEPTED`.
 Thêm loại mới đòi đủ ba bước như javadoc của enum đó ghi: nới enum MySQL, câu chữ ở
@@ -268,50 +263,34 @@ sửa tên vô tình trở thành một sự kiện ẩn toàn bộ nội dung n
 `type` xuống nguyên trạng và để `GroupService.modify` bỏ qua nhờ `if (type != null)` đã có sẵn — đây
 là một **break có chủ đích** khỏi TS parity, nên tách thành thay đổi riêng.
 
-### 10.2 ĐÃ SỬA — `PetContext` luôn null trên đường đọc
+### 10.2 ĐÃ GỠ — cơ chế `PetContext`
 
-Bug được phát hiện khi thử luồng thật: **người vừa tạo một nhóm PRIVATE vẫn bị hiện nút "gửi yêu cầu
-tham gia" vào nhóm của chính mình.**
+Mục này từng ghi một bug của `PetContextInterceptor` (chủ nhóm bị coi là người ngoài vì `petId`
+không bao giờ tới được route đọc). Toàn bộ cơ chế pet đã được gỡ khỏi hệ thống, nên bug đó không
+còn đối tượng.
 
-`PetContextInterceptor.preHandle` thoát ngay khi route không mang `@RequirePet`/`@RequireAnyPet` và
-không bao giờ đặt request attribute. Route đọc không thể mang `@RequirePet` (sẽ chặn luôn khách), nên
-`PetContext.optional()` **luôn trả null trên mọi route đọc** — việc thoát sớm xảy ra *trước* cả khi
-đọc token, nên đăng nhập cũng không thay đổi gì. Ba hệ quả:
-
-| Chỗ | Vỡ thế nào |
-|---|---|
-| `GET /v1/groups/{id}` | `viewerStatus` chỉ có thể là `NONE` → nhóm PRIVATE `restricted: true` với **cả chủ nhóm** |
-| `GET /v1/posts*` | nhánh D của `PostVisibility` là **code chết** → thành viên không đọc được bài trong nhóm mình |
-| `GET /v1/comments/{postId}` | y hệt, qua `CommentController` |
-
-Hỏng theo chiều **đóng** — không rò rỉ gì ra ngoài, nhưng nhóm riêng tư thành ra không dùng được.
-
-**Bản vá**: interceptor xác nhận `X-Pet-Id` bất cứ khi nào header có mặt, trên mọi route, nhưng chỉ
-*bắt buộc* nó ở `@RequirePet` (`resolveOptionalPet`). Bước so quyền sở hữu với tài khoản trong token
-giữ nguyên, nên vẫn không ai mạo danh thành viên được; header sai thì bị bỏ qua thay vì ném lỗi.
-
-**Điểm mù đã để lọt bug này**: 26 test của `GroupMembershipIntegrationTest` dùng
-`PetContextTestSupport.actAs()`, tức ghi thẳng request attribute và **đi vòng qua interceptor** — test
-service xanh trong khi route HTTP thật vỡ. `GroupPrivacyHttpIntegrationTest` được thêm để bịt đúng chỗ
-đó: nó đi qua MockMvc với header thật, và đã được xác nhận là **đỏ khi bỏ bản vá** (`expected:<MEMBER>
-but was:<NONE>`).
+Bài học thì còn nguyên và là lý do `GroupPrivacyHttpIntegrationTest` phải tồn tại: **test gọi
+thẳng service không nói được gì về việc danh tính người xem có tới được controller hay không.**
+Danh tính nay đến từ đúng một chỗ — token đã ký, qua `CurrentUser` — nên cả lớp lỗi "đặt danh
+tính bằng một kênh phụ" biến mất cùng với nó.
 
 ### 10.3 Cách ly database test
 
 Hai lỗi hạ tầng test lộ ra trong lúc sửa, cả hai đều không nằm ở code nghiệp vụ:
 
-- **Redis dùng chung.** `PetOwnerResolver` cache theo khoá `pet:owner:<petId>`. Mỗi lớp test có
-  database MySQL riêng nên `petId` đếm lại từ 1 và trùng nhau giữa các lớp — và trùng cả với database
-  dev đang chạy trên cùng Redis. Lớp chạy sau đọc được chủ sở hữu của pet thuộc lớp khác, biểu hiện là
+- **Redis dùng chung.** Mỗi lớp test có database MySQL riêng nên id đếm lại từ 1 và trùng nhau giữa
+  các lớp — và trùng cả với database dev đang chạy trên cùng Redis. Lớp chạy sau đọc trúng giá trị
+  cache của lớp khác, biểu hiện là
   `expected: 4 but was: 2`. Sửa bằng `IntegrationTestBase.redisUrl(int)`: db 0 để cho dev, mỗi lớp phụ
   thuộc resolver nhận một index riêng.
 - **`PostVisibilityIntegrationTest` không lặp lại được.** Nội dung bài là chuỗi cố định và mọi khẳng
   định so khớp đúng danh sách đó, nhưng database test tồn tại qua nhiều lần chạy nên lần thứ hai mỗi
   bài có hai bản. Sửa bằng `postRepository.deleteAll()` mở đầu `seed()`.
 
-Ngoài ra `lopet_java_*_test` từng giữ `group_members.account_id NOT NULL` và khoá chính
-`(account_id, group_id)` — di sản trước refactor pet mà `ddl-auto: update` không xoá nổi. Đã xử lý
-bằng cách xoá các database đó cho Hibernate dựng lại từ entity hiện tại.
+Ngoài ra `lopet_java_*_test` từng giữ `group_members.pet_id NOT NULL` và khoá chính
+`(group_id, pet_id)` — di sản của refactor pet mà `ddl-auto: update` không xoá nổi. Đã xử lý bằng
+cách xoá các database đó cho Hibernate dựng lại từ entity hiện tại. Database THẬT thì dùng
+`scripts/revert-pet-to-account-migration.sql`, vì ở đó dữ liệu phải được giữ.
 
 ### 10.4 `ddl-auto`
 
@@ -326,19 +305,18 @@ Dự án không có Flyway/Liquibase; schema do Hibernate sinh với `ddl-auto: 
 
 Hai bộ, và **phải có cả hai** — lý do ở §10.2:
 
-`GroupMembershipIntegrationTest` — 26 test, database `lopet_java_group_test`, tầng SERVICE với
-`PetContextTestSupport.actAs`. Phủ luật nghiệp vụ, nhưng đi vòng qua interceptor nên **không** nói được
-gì về route HTTP.
+`GroupMembershipIntegrationTest` — database `lopet_java_group_test`, tầng SERVICE với
+`AuthTestSupport.actAs`. Phủ luật nghiệp vụ, nhưng đặt danh tính thẳng vào `SecurityContext` nên
+**không** nói được gì về route HTTP.
 
-`GroupPrivacyHttpIntegrationTest` — 11 test, database `lopet_java_groupprivacy_test`, Redis db 3, đi
-qua MockMvc với header `Authorization` + `X-Pet-Id` THẬT. Đây là bộ chặn tái diễn bug §10.2; đã xác
-nhận nó đỏ khi bỏ bản vá. Bốn test trong đó là chốt chống mạo danh: vô danh hoặc người ngoài gửi
-`X-Pet-Id` của một thành viên vẫn phải bị che.
+`GroupPrivacyHttpIntegrationTest` — database `lopet_java_groupprivacy_test`, Redis db 3, đi qua
+MockMvc với header `Authorization` THẬT. Đây là bộ chặn cả lớp lỗi ở §10.2: danh tính người xem phải
+đi hết chuỗi filter → interceptor → controller thì `viewerStatus` mới đúng.
 
 Hai test canh đúng lỗ hổng của §6 và không được xoá:
 
-- `khong_thay_bai_khi_dang_cho` — pet vừa xin vào nhóm PRIVATE **không** đọc được bài nào trong đó
-  (nhánh D của `PostVisibility`);
+- `khong_thay_bai_khi_dang_cho` — người vừa xin vào nhóm PRIVATE **không** đọc được bài nào trong đó
+  (nhánh nhóm của `PostVisibility`);
 - `khong_dem_vao_danh_sach` — hàng PENDING không vào `members[]` cũng không vào `totalMembers`.
 
 Phần còn lại phủ: vào nhóm PUBLIC/PRIVATE, duyệt/từ chối/huỷ yêu cầu, ai được duyệt, hộp thư yêu cầu

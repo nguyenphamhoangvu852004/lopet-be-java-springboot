@@ -29,7 +29,7 @@ Tổng module Java:            25 module nghiệp vụ + 8 hạ tầng
 Bảng dữ liệu:                18 / 18
 Cột dữ liệu:                 145 / 145 (trùng tên, kiểu, nullable)
 Khoá ngoại:                  27 / 27 (trùng cả quy tắc ON DELETE)
-Sự kiện Socket.IO:           7 / 7
+Destination realtime:        8 / 8 (đổi giao thức, xem §4.1)
 Test:                        71 test, pass 100%
 ```
 
@@ -40,8 +40,8 @@ Test:                        71 test, pass 100%
 | Authentication | ĐẦY ĐỦ | login/signup/verify/reset × 2 tiền tố; JWT HS256 cùng payload; bcrypt cost 10 nên hash cũ dùng lại được |
 | Authorization | ĐẦY ĐỦ | đủ 4 tầng: permission (26 mã), ownership (kèm bypassRoles theo từng route), quan hệ bạn bè, capability nhà quảng cáo |
 | Database | ĐẦY ĐỦ | đối chiếu trực tiếp với schema do TypeORM sinh ra — xem DATABASE_MIGRATION_NOTES §5 |
-| Realtime | ĐẦY ĐỦ, khác cổng | netty-socketio, đúng 7 sự kiện và đúng quy ước phòng; **client phải đổi URL socket** (§4.1) |
-| Notification | ĐẦY ĐỦ | REST + emit socket; giữ nguyên khoá `notificationId` và cặp `objectType`/`type` |
+| Realtime | ĐẦY ĐỦ, khác giao thức | STOMP over WebSocket trên cùng cổng REST; đủ 7 luồng cũ + 1 destination; **client phải viết lại tầng realtime** (§4.1) |
+| Notification | ĐẦY ĐỦ | REST + đẩy realtime; giữ nguyên khoá `notificationId` và cặp `objectType`/`type` |
 | File upload | ĐẦY ĐỦ | Cloudinary; guard chạy trước upload đúng như thứ tự middleware cũ |
 | Search | ĐẦY ĐỦ | tìm bài theo nội dung, hồ sơ theo họ tên, gợi ý tài khoản/nhóm |
 | Pagination | KHÔNG CÓ Ở BẢN GỐC | không endpoint nào của TS nhận page/size; chỉ `take(10)` cho feed gợi ý — đã tái hiện |
@@ -74,7 +74,7 @@ Quá trình này phát hiện **hai lỗi thật** trước khi kịp gây hậu
 
 | Kịch bản | Kỳ vọng (theo bản TS) | Kết quả Java |
 |---|---|---|
-| `POST /v1/auth/login` đúng | `{statusCode, message, data:{id, accessToken, refreshToken}}`, **không có roles** | khớp |
+| `POST /v1/auth/login` đúng | `{statusCode, message, data:{id, accessToken}}`, **không có roles**; `refreshToken` ra bằng cookie `HttpOnly` | khớp |
 | roles trong JWT | `{"id":1,"email":...,"roles":["ADMIN"],"iat":...,"exp":...}` | khớp |
 | `POST /v1/password/login` | tồn tại (router mount 2 lần) | 200 |
 | Validation lỗi | `{statusCode:400, message:"Validation error", errors:[{field,message}]}` | khớp |
@@ -126,8 +126,9 @@ Hai bộ integration chạy trên MySQL thật với database riêng cho từng 
 8. **Các `:id` bị bỏ qua** ở `/accounts/suggest/:id`, `/friendships/send|receive/:id`,
    `/notifications/me/:id` — controller cũ dùng `req.user.id`. Giữ nguyên để URL client không đổi.
 9. **`/v1/messages/me/:id` đọc đối tượng hội thoại từ query `?targetId=`**, không từ path param.
-10. **Tên sự kiện socket `chat messsage`** (ba chữ `s`) và khoá DTO `linkReferfence` — sai chính tả
-    trong bản gốc, client đang dựa vào đúng chuỗi đó.
+10. **Khoá DTO `linkReferfence`** — sai chính tả trong bản gốc, client đang dựa vào đúng chuỗi đó.
+    (Tên sự kiện `chat messsage`, ba chữ `s`, từng nằm cùng nhóm này nhưng đã biến mất cùng
+    Socket.IO — xem §4.1.)
 11. **`likeList` / `listLike` / media có id hay không** khác nhau giữa bốn luồng đọc bài, vì mỗi hàm
     bên TS chỉ gán một tập trường; khoá không được gán thì vắng mặt trong JSON.
 12. **Thiếu `type` trong `PUT /v1/groups/:id` khiến nhóm thành PRIVATE** — controller cũ tính
@@ -137,36 +138,38 @@ Hai bộ integration chạy trên MySQL thật với database riêng cho từng 
 
 ## 4. Khác biệt không thể 1:1 — khai báo đầy đủ
 
-### 4.1. Socket.IO chạy trên cổng riêng
+### 4.1. Realtime đổi giao thức: Socket.IO → STOMP over WebSocket
 
 * **Hành vi TS**: Socket.IO gắn vào chính HTTP server của Express, dùng chung cổng `APP_PORT` (8080).
-* **Vì sao Java không làm được như vậy**: Tomcat sở hữu cổng HTTP và không cho thư viện khác chen
-  vào cùng listener; netty-socketio là một server Netty độc lập.
-* **Giải pháp**: Socket.IO nghe `SOCKET_PORT` (mặc định 8081), cùng protocol EIO4 nên
-  `socket.io-client` v4 của frontend giữ nguyên.
-* **Ảnh hưởng**: chạy trực tiếp bằng `java -jar` thì client phải trỏ URL socket sang cổng mới —
-  sửa đúng một dòng (`io("http://host:8081", { auth: { token } })`).
-* **Đã khép lại ở bản Docker**: image có sẵn nginx (`docker/nginx.conf.template`) định tuyến
-  `/socket.io/` về 127.0.0.1:8081 và phần còn lại về 127.0.0.1:8080, mở đúng một cổng công khai
-  là `$PORT` của Render. Deploy bằng image này thì frontend dùng chung một origin cho cả REST lẫn
-  socket, tức là khác biệt 4.1 không còn nhìn thấy được từ phía client. Chi tiết ở README §Deploy.
+* **Bản Java đầu tiên** dùng `netty-socketio` để giữ nguyên `socket.io-client` của frontend. Cái giá
+  là một server Netty độc lập ở `SOCKET_PORT` (8081), vì Tomcat sở hữu cổng HTTP và không cho thư
+  viện khác chen vào cùng listener. Kèm theo đó: một biến môi trường, một `EXPOSE`, một khối
+  `upstream` riêng trong nginx, và một ObjectMapper Jackson 2 tách rời khỏi cấu hình REST.
+* **Bản hiện tại** bỏ hẳn netty-socketio và dùng `spring-boot-starter-websocket` (STOMP), endpoint
+  `/ws` trên chính Tomcat. Cổng 8081 biến mất — đúng hình dạng "một cổng" của bản Express.
+* **Ảnh hưởng**: `socket.io-client` không nói được STOMP, nên **frontend phải viết lại tầng realtime**.
+  Đây là khác biệt duy nhất còn buộc client sửa code. Bảng ánh xạ 7 sự kiện cũ → destination mới,
+  thông điệp lỗi và snippet `@stomp/stompjs`: `docs/REALTIME_WEBSOCKET_MIGRATION.md`.
+* **Được thêm**: bản Socket.IO cho phép `join room` với tên phòng tuỳ ý, nên một tài khoản hợp lệ
+  vào được phòng của người khác và nghe lén. Bản STOMP chặn ở frame SUBSCRIBE —
+  `/topic/user.<id>/**` chỉ chính chủ nghe được, và client chỉ SEND được vào `/app/**`.
 
-### 4.2. Xác thực socket nằm ở `AuthTokenListener`, không phải `AuthorizationListener`
+### 4.2. Xác thực realtime nằm ở frame CONNECT
 
 * **Hành vi TS**: middleware `io.use(...)` đọc `handshake.auth.token`, trả mã lỗi riêng
   `TOKEN_EXPIRED` / `INVALID_TOKEN` / `AUTHENTICATION_ERROR`.
-* **Vì sao không dùng `AuthorizationListener`**: trong EIO4, `auth` đi trong gói CONNECT gửi *sau*
-  khi bắt tay HTTP xong, còn `AuthorizationListener` chạy *ngay lúc* bắt tay — khi đó
-  `handshakeData.getAuthToken()` luôn null, nên mọi kết nối đều bị từ chối ("thiếu auth.token").
-* **Giải pháp**: đăng ký `AuthTokenListener` trên namespace mặc định. Nó nhận đúng object `auth`,
-  và `AuthTokenResult` kèm được dữ liệu lỗi, nên client vẫn phân biệt được nguyên nhân qua
-  `err.message` của `connect_error` — ngang bằng bản TS.
-* **Hai bẫy còn lại của netty-socketio** (đã xử lý, xem javadoc `SocketIoConfig`):
-  1. `ConnectListener` chạy *trước* `AuthTokenListener` và với EIO4 còn được phát hai lần, nên
-     không đọc được `userId` ở đó — việc vào phòng `user_<id>` phải nằm trong `AuthTokenListener`.
-  2. Client không gửi `auth` thì thư viện **bỏ qua** `AuthTokenListener` và cho kết nối đi tiếp;
-     `SocketIoServerRunner` có đồng hồ 5 giây ngắt các kết nối vẫn chưa có danh tính, và chặn
-     luôn sự kiện `join room` từ kết nối chưa xác thực.
+* **Bản STOMP**: `StompAuthChannelInterceptor` đọc header `Authorization: Bearer <jwt>` của frame
+  CONNECT, gọi đúng `JwtService.parseAccessToken()` mà HTTP filter dùng, rồi gắn
+  `WebSocketPrincipal` vào phiên. Ba mã lỗi giữ nguyên chuỗi, chỉ đổi chỗ đọc: từ `err.message` của
+  `connect_error` sang header `message` của frame `ERROR`.
+* **Hai bẫy của netty-socketio đã biến mất cùng thư viện**:
+  1. `ConnectListener` chạy trước khi có danh tính (và với EIO4 còn được phát hai lần), nên việc vào
+     phòng riêng phải nằm trong `AuthTokenListener`. STOMP không có giai đoạn này: CONNECT hỏng thì
+     phiên không bao giờ hình thành.
+  2. Client không gửi `auth` thì netty-socketio bỏ qua listener và cho kết nối đi tiếp — phải có một
+     watchdog 5 giây dọn dẹp, và trong 5 giây đó kết nối vô danh gửi được sự kiện bất kỳ. Với STOMP,
+     interceptor ném ra ở CONNECT là kết nối đóng ngay, **không tồn tại phiên vô danh** nên watchdog
+     và mọi lệnh kiểm tra `userId == null` rải rác trong handler đều bỏ được.
 
 ### 4.3. JWT được tự hiện thực thay vì dùng thư viện
 
@@ -234,14 +237,15 @@ cd ../lopet-be-java-springboot
 mvn package -DskipTests
 DATABASE_HOSTNAME=127.0.0.1 DATABASE_PORT=3307 DATABASE_USERNAME=root \
 DATABASE_PASSWORD=nguyenvu DATABASE_NAME=socialmedia \
-REDIS_HOSTNAME=127.0.0.1 REDIS_PORT=6379 APP_PORT=8080 SOCKET_PORT=8081 \
+REDIS_HOSTNAME=127.0.0.1 REDIS_PORT=6379 APP_PORT=8080 \
 java -jar target/lopet-0.0.1-SNAPSHOT.jar
 
 # 3. Test (cần MySQL ở cổng 3307)
 mvn test
 ```
 
-Biến môi trường trùng tên với `example.env` của `lopet-be`, thêm đúng một biến mới: `SOCKET_PORT`.
+Biến môi trường trùng tên hoàn toàn với `example.env` của `lopet-be` — không thêm biến mới nào.
+(`SOCKET_PORT` từng là biến duy nhất bản Java thêm vào; nó biến mất cùng netty-socketio.)
 
 ---
 

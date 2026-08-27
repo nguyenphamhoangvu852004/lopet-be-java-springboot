@@ -34,4 +34,7 @@ build/
 
 .env*
 !.env.example
+/docs/*
+/docs/*.md
 
+/scripts/*

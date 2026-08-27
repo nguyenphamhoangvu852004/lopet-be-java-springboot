@@ -63,15 +63,15 @@ NULL); `granted_at` datetime DEFAULT CURRENT_TIMESTAMP; + 3 cột BaseEntity.
 > `groups` là **từ khoá dành riêng của MySQL 8.0.2+** → mọi tham chiếu phải được quote bằng backtick.
 
 ### group_members
-`group_id` int + `pet_id` int — **PK tổ hợp** (đổi từ `account_id` ở refactor pet); `role`
+`group_id` int + `account_id` int — **PK tổ hợp**; `role`
 enum('OWNER','ADMIN','MEMBER') DEFAULT 'MEMBER'; `status` enum('PENDING','ACTIVE') NOT NULL DEFAULT
 'ACTIVE'; `invited_by` int NULL; `joined_at` datetime DEFAULT CURRENT_TIMESTAMP; + 3 cột BaseEntity.
 > Rời nhóm / bị từ chối = xoá bản ghi, nên không có BANNED hay LEFT. Nhưng **"tồn tại bản ghi" KHÔNG
 > còn đồng nghĩa "đang là thành viên"**: một yêu cầu vào nhóm hoặc một lời mời chưa trả lời cũng là
 > một bản ghi ở đây với `status = PENDING`. Mọi truy vấn phân quyền phải lọc `status = 'ACTIVE'`.
 >
-> `PENDING` mang hai nghĩa, phân biệt bằng `invited_by`: NULL = pet tự xin vào nhóm PRIVATE (quản trị
-> nhóm duyệt), NOT NULL = được thành viên mời (chính pet được mời duyệt). `invited_by` **cố ý không có
+> `PENDING` mang hai nghĩa, phân biệt bằng `invited_by`: NULL = tự xin vào nhóm PRIVATE (quản trị
+> nhóm duyệt), NOT NULL = được thành viên mời (chính người được mời duyệt). `invited_by` **cố ý không có
 > khoá ngoại** — `SET NULL` sẽ làm lệch nghĩa đó, `CASCADE` sẽ xoá cả hàng đã ACTIVE. Xem
 > `docs/GROUP_MANAGEMENT.md` §2.
 

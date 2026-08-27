@@ -16,5 +16,5 @@ import lombok.Setter;
 public class GroupMemberId implements Serializable {
 
     private Integer groupId;
-    private Integer petId;
+    private Integer accountId;
 }

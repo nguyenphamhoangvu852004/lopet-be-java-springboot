@@ -12,7 +12,8 @@ import com.nguyenvu.lopet.realtime.RealtimeGateway;
 import lombok.RequiredArgsConstructor;
 
 /**
- * Đẩy sự kiện {@code message status} về NGƯỜI GỬI của từng tin vừa đổi trạng thái.
+ * Đẩy sự kiện trạng thái về NGƯỜI GỬI của từng tin vừa đổi trạng thái, qua
+ * {@code /topic/user.<senderId>/message-status}.
  *
  * <p>Gọi từ bên NGOÀI transaction của service, không phải bên trong: xem
  * {@link MessageDtos.StatusUpdateResult}.
@@ -36,8 +37,7 @@ public class MessageStatusNotifier {
                         Collectors.mapping(MessageDtos.StatusChange::messageId, Collectors.toList())));
 
         theoNguoiGui.forEach((senderId, messageIds) -> realtimeGateway.emit(
-                RealtimeGateway.userRoom(senderId),
-                RealtimeGateway.EVENT_MESSAGE_STATUS,
+                RealtimeGateway.userTopic(senderId, RealtimeGateway.CHANNEL_MESSAGE_STATUS),
                 new MessageDtos.MessageStatusEvent(messageIds, result.status(), result.at(),
                         result.byUserId())));
     }

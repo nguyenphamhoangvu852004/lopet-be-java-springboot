@@ -18,7 +18,7 @@ class PermissionCatalogTest {
         Set<String> granted = PermissionCatalog.resolvePermissions(List.of());
 
         assertThat(granted).contains("post:create", "comment:create", "group:create",
-                "report:create", "accountProfile:update:own", "petProfile:update:own", "advertiser:register");
+                "report:create", "accountProfile:update:own", "advertiser:register");
         assertThat(granted).hasSize(PermissionCatalog.BASELINE_PERMISSIONS.size());
     }
 
