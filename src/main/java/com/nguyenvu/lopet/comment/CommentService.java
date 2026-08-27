@@ -1,21 +1,21 @@
 package com.nguyenvu.lopet.comment;
 
+import java.time.LocalDate;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.nguyenvu.lopet.account.entity.Account;
+import com.nguyenvu.lopet.account.repository.AccountRepository;
+import com.nguyenvu.lopet.accountprofile.entity.AccountProfile;
 import com.nguyenvu.lopet.comment.dto.CommentDtos;
 import com.nguyenvu.lopet.comment.entity.Comment;
 import com.nguyenvu.lopet.comment.repository.CommentRepository;
 import com.nguyenvu.lopet.common.exception.BadRequestException;
 import com.nguyenvu.lopet.notification.NotificationPublisher;
-import com.nguyenvu.lopet.pet.entity.Pet;
-import com.nguyenvu.lopet.pet.repository.PetRepository;
-import com.nguyenvu.lopet.petprofile.entity.PetProfile;
 import com.nguyenvu.lopet.post.entity.Post;
 import com.nguyenvu.lopet.post.repository.PostRepository;
-import com.nguyenvu.lopet.security.petcontext.PetContext;
 
 import lombok.RequiredArgsConstructor;
 
@@ -25,10 +25,6 @@ import lombok.RequiredArgsConstructor;
  * <p>Trước bản vá, luồng đọc bình luận nạp bài bằng hàm không lọc còn route thì không xác thực, nên
  * danh sách bình luận (kèm username/email người bình luận) của một bài PRIVATE vẫn đọc được bởi
  * khách vãng lai dù thân bài đã được che.
- *
- * <p>Tác giả bình luận là một THÚ CƯNG, luôn lấy từ {@link PetContext#require()}. Tài khoản trong
- * token chỉ còn hai việc: lọc quyền xem bài, và làm người gửi/nhận của thông báo — hộp thông báo
- * thuộc về con người chứ không về con vật.
  */
 @Service
 @RequiredArgsConstructor
@@ -37,15 +33,16 @@ public class CommentService {
     private final CommentRepository commentRepository;
     private final PostRepository postRepository;
     private final NotificationPublisher notificationPublisher;
-    private final PetRepository petRepository;
+    private final AccountRepository accountRepository;
 
     @Transactional
     public CommentDtos.CreateCommentResponse create(Integer accountId, Integer postId, Integer replyCommentId,
                                                      String content, String imageUrl) {
-        Pet author = requireAuthorPet();
+        Account account = accountRepository.findById(accountId)
+                .orElseThrow(() -> new BadRequestException("No account found"));
 
         // Không bình luận được vào bài mà mình không có quyền xem
-        Post post = postRepository.findVisibleById(postId, accountId, author.getId())
+        Post post = postRepository.findVisibleById(postId, accountId)
                 .orElseThrow(() -> new BadRequestException("No post found"));
 
         Comment parent = null;
@@ -64,7 +61,7 @@ public class CommentService {
         Comment saved = commentRepository.save(Comment.builder()
                 .images(imageUrl == null ? "" : imageUrl)
                 .text(content)
-                .pet(author)
+                .account(account)
                 .parent(parent)
                 .post(post)
                 .build());
@@ -75,12 +72,12 @@ public class CommentService {
     }
 
     @Transactional(readOnly = true)
-    public CommentDtos.GetCommentsResponse getAllFromPost(Integer postId, Integer viewerId, Integer viewerPetId) {
-        Post post = postRepository.findVisibleById(postId, viewerId, viewerPetId)
+    public CommentDtos.GetCommentsResponse getAllFromPost(Integer postId, Integer viewerId) {
+        Post post = postRepository.findVisibleById(postId, viewerId)
                 .orElseThrow(() -> new BadRequestException("No post found"));
 
-        // Bản TS gọi profileRepo theo TỪNG bình luận (N+1). Hồ sơ công khai nay nằm trong đồ thị nạp
-        // của findAllByPostId, nên không còn truy vấn phụ nào — response không đổi.
+        // Bản TS gọi profileRepo theo TỪNG bình luận (N+1). Hồ sơ nay nằm trong đồ thị nạp của
+        // findAllByPostId, nên không còn truy vấn phụ nào — response không đổi.
         List<CommentDtos.CommentItem> items = commentRepository.findAllByPostId(post.getId()).stream()
                 .map(this::toItem)
                 .toList();
@@ -102,37 +99,33 @@ public class CommentService {
     }
 
     private CommentDtos.CommentItem toItem(Comment comment) {
-        Pet pet = comment.getPet();
-        PetProfile profile = pet == null ? null : pet.getPetProfile();
+        Account account = comment.getAccount();
+        AccountProfile profile = account == null ? null : account.getAccountProfile();
 
         CommentDtos.CommentProfile profileDto = new CommentDtos.CommentProfile(
                 profile == null ? 0 : profile.getId(),
-                orEmpty(profile == null ? null : profile.getHandle()),
-                orEmpty(profile == null ? null : profile.getDisplayName()),
                 orEmpty(profile == null ? null : profile.getAvatarUrl()),
                 orEmpty(profile == null ? null : profile.getCoverUrl()),
-                orEmpty(profile == null ? null : profile.getBio()));
+                orEmpty(profile == null ? null : profile.getBio()),
+                orEmpty(profile == null ? null : profile.getFullName()),
+                orEmpty(profile == null ? null : profile.getPhoneNumber()),
+                profile == null || profile.getSex() == null ? 0 : profile.getSex(),
+                profile == null || profile.getDateOfBirth() == null ? LocalDate.now() : profile.getDateOfBirth(),
+                orEmpty(profile == null ? null : profile.getHometown()));
 
-        CommentDtos.CommentPet petDto = new CommentDtos.CommentPet(
-                pet == null ? 0 : pet.getId(), orEmpty(pet == null ? null : pet.getName()), profileDto);
+        CommentDtos.CommentAccount accountDto = new CommentDtos.CommentAccount(
+                account == null ? 0 : account.getId(),
+                orEmpty(account == null ? null : account.getUsername()),
+                orEmpty(account == null ? null : account.getEmail()), profileDto);
 
-        return new CommentDtos.CommentItem(comment.getId(), petDto,
+        return new CommentDtos.CommentItem(comment.getId(), accountDto,
                 comment.getParent() == null ? null : comment.getParent().getId(),
                 comment.getText(), comment.getImages(), comment.getCreatedAt());
     }
 
-    /** Xem ghi chú cùng tên ở {@code PostService} */
-    private Pet requireAuthorPet() {
-        Integer petId = PetContext.require();
-        return petRepository.findById(petId)
-                .orElseThrow(() -> new BadRequestException("Thú cưng không tồn tại hoặc đã ngừng hoạt động"));
-    }
-
-    /** Chủ tài khoản đứng sau pet tác giả của bài — người nhận thông báo */
+    /** Tác giả bài — người nhận thông báo */
     private Integer ownerAccountIdOf(Post post) {
-        return post.getPet() == null || post.getPet().getAccount() == null
-                ? null
-                : post.getPet().getAccount().getId();
+        return post.getAccount() == null ? null : post.getAccount().getId();
     }
 
     private String orEmpty(String value) {

@@ -25,11 +25,11 @@ Cột **AuthZ** ghi tầng phân quyền: `perm:<code>` = `requirePermission`, `
 
 | # | Method | Endpoint | Auth | AuthZ | Body | Response `data` | Lỗi | Java |
 |---|---|---|---|---|---|---|---|---|
-| 1 | POST | `/v1/auth/login` | - | Joi `loginValidation` | `{username, password}` | `{id, accessToken, refreshToken}` | 404 `No user found`; 400 `Người dùng <username> đã bị khoá`; 400 `Mật khẩu không trùng khớp` | DONE |
+| 1 | POST | `/v1/auth/login` | - | Joi `loginValidation` | `{username, password}` | `{id, accessToken}` + `Set-Cookie: refreshToken` (HttpOnly) | 404 `No user found`; 400 `Người dùng <username> đã bị khoá`; 400 `Mật khẩu không trùng khớp` | DONE |
 | 2 | POST | `/v1/auth/signup` | - | Joi `registerValidation` | `{email, username, password, confirmPassword}` | `{id, email, username}` (201) | 400 `Bạn cần xác thực OTP trước khi đăng ký.`; 409 email/username trùng; 400 password≠confirm | DONE |
 | 3 | POST | `/v1/auth/verify` | - | - | `{email, password}` | `{isValid: true}` | 404 `Không tim thấy tài khoản`; 400 `Sai mật khẩu` | DONE |
 | 4 | POST | `/v1/auth/reset` | - | Joi `resetPasswordValidation` | `{email, password, confirmPassword}` | `{id, email, username}` | 400 `Mật khẩu xác nhận không khớp`; 403 `Bạn cần xác thực OTP trước khi đổi mật khẩu.`; 404 | DONE |
-| 5 | POST | `/v1/auth/refresh` | - | - | `{refreshToken}` | `{id, accessToken, refreshToken}` | 401 `Refresh token đã hết hạn`; 401 `Refresh token không hợp lệ`; 401 `Người dùng <username> đã bị khoá`; 400 Validation error | **MỚI** |
+| 5 | POST | `/v1/auth/refresh` | - | - | Cookie `refreshToken` (không có body) | `{id, accessToken}` + `Set-Cookie: refreshToken` (token đã xoay vòng) | 401 `Refresh token đã hết hạn`; 401 `Refresh token không hợp lệ`; 401 `Người dùng <username> đã bị khoá` | **MỚI** |
 | 1b–5b | POST | `/v1/password/{login,signup,verify,reset,refresh}` | | | | | | DONE |
 
 **Chi tiết nghiệp vụ**
@@ -103,18 +103,17 @@ OTP 6 chữ số, Redis key `otp:<email>` TTL **120s**. Verify xoá `otp:` và �
 | 26 | DELETE | `/v1/groups` | req | `perm:group:delete:own|group:delete` + `svc: isOwned` (**đúng OWNER**) | body `{groupId}` | DONE |
 | 27 | DELETE | `/v1/groups/members` | req | `perm:group:update:own` + `svc: canManage` | body `{groupId, member}`; 400 nếu target là OWNER | DONE |
 | 28 | PUT | `/v1/groups/:id` | req | `perm:group:update:own` + `svc: canManage` | multipart `image`. **Defect: `uploadedImage.secure_url` đọc vô điều kiện → thiếu file là 500** | DONE |
-| 28a | GET | `/v1/groups/joined/pets/:id` | - | - | nhóm mà MỘT thú cưng đang tham gia (ACTIVE) | NEW |
 | 28b | POST | `/v1/groups/:id/join` | req | `@RequirePet` | PUBLIC → ACTIVE ngay; PRIVATE → PENDING chờ duyệt. Đang được mời thì coi như chấp nhận. 409 nếu đã là thành viên | NEW |
-| 28c | DELETE | `/v1/groups/:id/join` | req | `@RequirePet` | huỷ yêu cầu do chính pet gửi | NEW |
+| 28c | DELETE | `/v1/groups/:id/join` | req | - | huỷ yêu cầu do chính mình gửi | NEW |
 | 28d | DELETE | `/v1/groups/:id/leave` | req | `@RequirePet` | 400 nếu là OWNER | NEW |
 | 28e | GET | `/v1/groups/:id/requests` | req | `perm:group:update:own` + `svc: requireManager` | chỉ yêu cầu tự gửi (`invited_by` null), không lẫn lời mời | NEW |
-| 28f | POST | `/v1/groups/requests/approve`\|`/reject` | req | `perm:group:update:own` + `svc: requireManager` | body `{groupId, petId}`; reject = xoá hàng | NEW |
-| 28g | GET | `/v1/groups/invites/mine` | req | `@RequirePet` | hộp thư lời mời của pet đang thao tác | NEW |
+| 28f | POST | `/v1/groups/requests/approve`\|`/reject` | req | `perm:group:update:own` + `svc: requireManager` | body `{groupId, accountId}`; reject = xoá hàng | NEW |
+| 28g | GET | `/v1/groups/invites/mine` | req | - | hộp thư lời mời của tài khoản đang đăng nhập | NEW |
 | 28h | POST | `/v1/groups/invites/accept`\|`/reject` | req | `@RequirePet` | body `{groupId}`; chỉ chạm hàng có `invited_by` khác null | NEW |
 
 **Cơ chế vào nhóm** (chi tiết: `docs/GROUP_MANAGEMENT.md`): `group_members` nhận thêm
-`status enum('PENDING','ACTIVE')` và `invited_by`. `PENDING` + `invited_by` NULL = pet tự xin vào nhóm
-PRIVATE, quản trị nhóm duyệt; `PENDING` + `invited_by` khác NULL = được mời, chính pet được mời duyệt.
+`status enum('PENDING','ACTIVE')` và `invited_by`. `PENDING` + `invited_by` NULL = tự xin vào nhóm
+PRIVATE, quản trị nhóm duyệt; `PENDING` + `invited_by` khác NULL = được mời, chính người được mời duyệt.
 Từ chối = xoá hàng. **Mọi truy vấn phân quyền lọc `status = ACTIVE`.**
 
 
@@ -179,8 +178,8 @@ Response chung của 41–43: `{me: {id, username, imageUrl, status?}, others: [
 | 48 | GET | `/v1/messages/:id` | req | `own: sender hoặc receiver` (**bypassRoles rỗng — ADMIN cũng bị chặn**) | | DONE |
 | 49 | PATCH | `/v1/messages/status/:id` | req | như trên **+ chỉ RECEIVER** | body `{status}`; **không lùi trạng thái** (lùi → no-op, không lỗi) | DONE |
 | 50 | GET | `/v1/messages/me/:id` | req | - | **đối tượng hội thoại lấy từ query `?targetId=`**, `:id` bị bỏ qua; sắp xếp `createdAt DESC` | DONE |
-| 51 | POST | `/v1/messages` | req | - | multipart `image`; body `{content, receiverId}`; **emit socket `chat messsage`** tới room `user_<receiverId>`; response = input DTO **+ `id`, `status`, `createdAt`** | DONE |
-| 51a | PATCH | `/v1/messages/delivered` | req | lọc trong query: chỉ tin có `receiver = token` | body `{messageIds: []}`; đường lui REST của socket `message delivered`; id lạ bị **bỏ qua âm thầm** | DONE |
+| 51 | POST | `/v1/messages` | req | - | multipart `image`; body `{content, receiverId}`; **đẩy realtime tới `/topic/user.<receiverId>/chat`**; response = input DTO **+ `id`, `status`, `createdAt`** | DONE |
+| 51a | PATCH | `/v1/messages/delivered` | req | lọc trong query: chỉ tin có `receiver = token` | body `{messageIds: []}`; đường lui REST của `/app/message.delivered`; id lạ bị **bỏ qua âm thầm** | DONE |
 | 51b | PATCH | `/v1/messages/read?partnerId=` | req | reader = token | đánh dấu READ **cả hội thoại** trong một UPDATE | DONE |
 | 51c | GET | `/v1/messages/unread-count` | req | - | `{count}` — mọi tin `receiver = token` và `status <> READ` | DONE |
 
@@ -192,13 +191,13 @@ Trạng thái tin nhắn đi MỘT CHIỀU `SENT → DELIVERED → READ` (`Messa
 
 | # | Method | Endpoint | Auth | AuthZ | Ghi chú | Java |
 |---|---|---|---|---|---|---|
-| 52 | POST | `/v1/notifications` | req | - | body `{receptorId, content, objectType}`; actor = token; **emit `notification`** tới `user_<receptorId>` | DONE |
+| 52 | POST | `/v1/notifications` | req | - | body `{receptorId, content, objectType}`; actor = token; **đẩy realtime tới `/topic/user.<receptorId>/notification`** | DONE |
 | 53 | GET | `/v1/notifications/:id` | req | - (**không kiểm receptor**) | trả kèm actor/receptor + profile; `withDeleted: true` | DONE |
 | 54 | GET | `/v1/notifications/me/:id` | req | - | `:id` **bị bỏ qua**, dùng token; `createdAt DESC` | DONE |
-| 55 | PUT | `/v1/notifications/:id` | req | - (**không kiểm receptor**) | body `{status}`; **emit `change status`** tới room `object_<id>` | DONE |
+| 55 | PUT | `/v1/notifications/:id` | req | - (**không kiểm receptor**) | body `{status}`; **đẩy realtime tới `/topic/notification.<id>`** | DONE |
 
-Khoá trong response là **`notificationId`** (không phải `id`); REST dùng key `type`, socket dùng
-`objectType` (create) và `type` (change status).
+Khoá trong response là **`notificationId`** (không phải `id`); REST dùng key `type`, payload realtime
+dùng `objectType` (kênh `notification`) và `type` (`/topic/notification.<id>`).
 
 ## 11. Report — `/v1/reports`
 
@@ -235,36 +234,43 @@ Khoá trong response là **`notificationId`** (không phải `id`); REST dùng k
 
 ---
 
-## 15. Socket.IO (namespace mặc định `/`)
+## 15. Realtime — STOMP over WebSocket (`/ws`)
 
-| Chiều | Event | Payload | Điều kiện | Java |
+Endpoint `ws(s)://<host>/ws` trên cùng cổng với REST. Prefix ứng dụng `/app`, broker `/topic`,
+không dùng SockJS. Bảng ánh xạ đầy đủ từ 7 sự kiện Socket.IO cũ và snippet client:
+[`docs/REALTIME_WEBSOCKET_MIGRATION.md`](REALTIME_WEBSOCKET_MIGRATION.md).
+
+| Chiều | Frame / destination | Payload | Điều kiện | Java |
 |---|---|---|---|---|
-| handshake | `auth.token` | JWT access token | thiếu → `BadRequest`; hết hạn → `TOKEN_EXPIRED`; sai → `INVALID_TOKEN` | DONE |
-| server | (connection) | tự `join('user_<userId>')` | | DONE |
-| client→server | `join room` | `room: string` | join thêm room tuỳ ý | DONE |
-| client→server | `disconnect` | | chỉ log | DONE |
-| server→client | `chat messsage` *(sic — 3 chữ s)* | `{message, from}` → room `user_<receiverId>` | khi POST `/v1/messages` | DONE |
-| server→client | `notification` | `{actorId, receptorId, content, objectType, status, createdAt}` → `user_<receptorId>` | khi POST `/v1/notifications` | DONE |
-| server→client | `change status` | `{notificationId, actorId, receptorId, content, type, status, createdAt}` → room `object_<id>` | khi PUT `/v1/notifications/:id` | DONE |
-| client→server | `message delivered` | `{messageIds: []}` | người nhận ack lô tin đã tới thiết bị | DONE |
-| client→server | `message read` | `{partnerId}` | người nhận mở hội thoại → READ toàn bộ | DONE |
-| server→client | `message status` | `{messageIds, status, at, byUserId}` → room `user_<senderId>` | sau hai sự kiện trên và sau `PATCH /status`, `/delivered`, `/read` | DONE |
+| handshake | `CONNECT` header `Authorization: Bearer <jwt>` | — | thiếu → `AUTHENTICATION_ERROR`; hết hạn → `TOKEN_EXPIRED`; sai → `INVALID_TOKEN`; trả về ở header `message` của frame `ERROR` | DONE |
+| client→server | `SUBSCRIBE` | — | thay cho sự kiện `join room`; destination ngoài hợp đồng → `FORBIDDEN_DESTINATION` | DONE |
+| server→client | `/topic/user.<receiverId>/chat` | `{message, from}` | khi POST `/v1/messages` | DONE |
+| server→client | `/topic/user.<receptorId>/notification` | `{notificationId, actorId, receptorId, content, objectType, objectId, status, createdAt}` | khi POST `/v1/notifications` | DONE |
+| server→client | `/topic/notification.<id>` | `{notificationId, actorId, receptorId, content, type, status, createdAt}` | khi PUT `/v1/notifications/:id` | DONE |
+| client→server | `SEND /app/message.delivered` | `{messageIds: []}` | người nhận ack lô tin đã tới thiết bị | DONE |
+| client→server | `SEND /app/message.read` | `{partnerId}` | người nhận mở hội thoại → READ toàn bộ | DONE |
+| server→client | `/topic/user.<senderId>/message-status` | `{messageIds, status, at, byUserId}` | sau hai frame trên và sau `PATCH /status`, `/delivered`, `/read` | DONE |
 
-Ba sự kiện trạng thái là phần THÊM VÀO của bản Java, bản Express không có. Ghi chú triển khai:
+Ba destination trạng thái là phần THÊM VÀO của bản Java, bản Express không có. Ghi chú triển khai:
 
-- Danh tính của hai sự kiện client→server lấy từ `client.get("userId")` (do `AuthTokenListener` gắn),
-  **không bao giờ từ payload** — xem `MessageSocketHandlers`.
-- `message status` gộp theo NGƯỜI GỬI: một lần đọc cả hội thoại chỉ tốn một sự kiện cho mỗi người,
+- Danh tính của hai frame client→server lấy từ `Principal` của phiên (do `StompAuthChannelInterceptor`
+  gắn ở frame CONNECT), **không bao giờ từ payload** — xem `MessageStompController`.
+- `message-status` gộp theo NGƯỜI GỬI: một lần đọc cả hội thoại chỉ tốn một frame cho mỗi người,
   và không ai thấy id tin nhắn của người khác.
 - Sự kiện chỉ rời server SAU khi transaction commit (service trả `StatusUpdateResult`, caller mới gọi
   `MessageStatusNotifier`) — bắn từ trong transaction thì người gửi có thể thấy "đã xem" của một
   transaction sắp rollback.
-- Handler nghiệp vụ đăng ký qua `SocketEventRegistrar` để `realtime` không phải phụ thuộc ngược vào
-  các module nghiệp vụ.
+- Mọi destination server→client dựng qua `RealtimeGateway`; chiều ngược lại là `@MessageMapping` nằm
+  trong chính module nghiệp vụ, nên `realtime` không phụ thuộc ngược vào `message`/`notification`.
 
-CORS socket: `origin:'*'`, methods GET/POST/PUT/DELETE/PATCH.
+Bảo mật destination (bản Socket.IO KHÔNG có, vì `join room` nhận tên phòng tuỳ ý):
 
----
+- `/topic/user.<id>/**` chỉ chính chủ `<id>` subscribe được;
+- `/topic/notification.<id>` cần đã xác thực, không cần là người nhận — giữ đúng phòng `object_<id>`;
+- client chỉ `SEND` được vào `/app/**`; gửi thẳng vào `/topic/**` bị chặn, nếu không thì ai cũng
+  giả được tin nhắn của người khác.
+
+CORS WebSocket: dùng chung `lopet.cors.allowed-origins` với REST.
 
 ## 16. Định dạng response
 
@@ -287,4 +293,4 @@ CORS socket: `origin:'*'`, methods GET/POST/PUT/DELETE/PATCH.
 Lỗi không phải `HttpError` (ví dụ `new Error(...)` trong MessageService/NotificationService) →
 `error.code` undefined → HTTP **500** với message gốc.
 
-**Tổng: 68 route handler, 72 đường dẫn (do authRouter mount 2 lần), 7 sự kiện socket.**
+**Tổng: 68 route handler, 72 đường dẫn (do authRouter mount 2 lần), 8 destination realtime.**

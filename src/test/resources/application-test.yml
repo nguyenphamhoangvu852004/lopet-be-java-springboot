@@ -22,9 +22,8 @@ spring:
   # file .env thì chuỗi `${REDIS_URL}` đi nguyên văn xuống Lettuce -> "Invalid Redis URL" làm vỡ context
   # của MọI test tích hợp. Chỉ khai host/port là không đủ vì `url` được ưu tiên hơn.
   #
-  # DATABASE 1, KHÔNG phải 0: ứng dụng dev chạy trên cùng Redis và cache `pet:owner:<petId>` ở db 0.
-  # Database test được dựng lại từ entity nên petId đếm lại từ 1, trùng ngay với petId của dev — và
-  # resolver sẽ trả về CHỦ CỦA PET DEV cho pet của test. Biểu hiện là các test quyền sở hữu pet đỏ
+  # DATABASE 1, KHÔNG phải 0: ứng dụng dev chạy trên cùng Redis và dùng db 0. Database test được dựng
+  # lại từ entity nên id đếm lại từ 1 và trùng ngay với id của dev. Biểu hiện là test đỏ
   # với "expected: 4 but was: 2", nhưng nguyên nhân không nằm ở code nào trong repo này cả.
   data:
     redis:
@@ -67,10 +66,6 @@ lopet:
     email: ''
     username: ''
     password: ''
-
-  socket:
-    hostname: localhost
-    port: 0
 
 logging:
   level:

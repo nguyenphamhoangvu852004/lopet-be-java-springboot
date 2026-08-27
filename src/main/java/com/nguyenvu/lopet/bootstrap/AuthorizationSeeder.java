@@ -35,7 +35,7 @@ public class AuthorizationSeeder {
     private final RoleRepository roleRepository;
 
     @Transactional
-    public void seed() {
+    public void execute() {
         for (PermissionDef definition : PermissionCatalog.ALL_PERMISSIONS) {
             Permission permission = permissionRepository.findByCode(definition.code())
                     .orElseGet(() -> Permission.builder().code(definition.code()).build());

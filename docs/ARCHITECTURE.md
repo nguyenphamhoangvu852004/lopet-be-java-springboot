@@ -15,7 +15,7 @@ trong được phép khác; API contract và business behavior thì không.
 | Auth | `jsonwebtoken` | `jjwt` + Spring Security filter |
 | Hash | bcryptjs (cost 10) | `BCryptPasswordEncoder(10)` — **cùng định dạng `$2a$`** |
 | Validation | Joi | Bean Validation (Jakarta) + validator tuỳ biến |
-| Realtime | socket.io 4.8 | **netty-socketio** (cùng protocol EIO4 → client socket.io-client không đổi) |
+| Realtime | socket.io 4.8 | **STOMP over WebSocket** (`spring-boot-starter-websocket`, endpoint `/ws` trên cùng cổng REST) |
 | Upload | multer + Cloudinary SDK | `MultipartFile` + Cloudinary Java SDK |
 | Mail | nodemailer (SMTP) | **Resend HTTP API** (`com.resend:resend-java`) — SMTP bị hosting chặn cổng |
 | Log | winston + daily-rotate | Logback + `RollingFileAppender` |
@@ -26,7 +26,7 @@ trong được phép khác; API contract và business behavior thì không.
 ```
 com.nguyenvu.lopet
 ├── LopetApplication.java
-├── config/            CorsConfig, JacksonConfig, RedisConfig, MailConfig, CloudinaryConfig, SocketIoConfig
+├── config/            WebConfig (CORS), JacksonConfig, RedisConfig, MailConfig, CloudinaryConfig
 ├── bootstrap/         AuthorizationSeeder, AdminInitializer   (thay cho seedAuthorization + InitAdmin)
 ├── common/
 │   ├── response/      ApiResponse<T>, ResponseFactory
@@ -39,7 +39,8 @@ com.nguyenvu.lopet
 │   ├── authz/         PermissionCatalog, RequirePermission(+Aspect), OwnershipGuard,
 │   │                  FriendOrSelfGuard, ApprovedAdvertiserGuard
 │   └── SecurityConfig.java
-├── realtime/          SocketIoConfig (server + xác thực), SocketIoServerRunner, RealtimeGateway
+├── realtime/          WebSocketConfig (/ws + broker), StompAuthChannelInterceptor (xác thực +
+│                   guard destination), WebSocketPrincipal, RealtimeGateway
 ├── account/  auth/  role/  email/  profile/
 ├── group/    post/ (media, like)  comment/
 ├── friendship/  message/  notification/
@@ -79,7 +80,9 @@ dùng `hasRole()` — mọi quyết định đi qua PermissionCatalog để trù
 5. Mã lỗi lệch chuẩn giữ nguyên: thiếu token → 400; không đủ quyền xem bài → 404; login sai mật khẩu → 400.
 6. Tên field trong DTO giữ nguyên, kể cả chỗ đặt tên lạ: `notificationId`, `linkReferfence` (sai
    chính tả trong DTO ads), `postId` thay vì `id`, `likeList`/`listLike` khác nhau giữa hai DTO.
-7. Tên sự kiện socket giữ nguyên, kể cả `chat messsage` (ba chữ `s`).
+7. Ngoại lệ: tên sự kiện socket KHÔNG còn giữ nguyên. Tầng realtime đã đổi giao thức nên client
+   phải viết lại phần đó, và `chat messsage` (ba chữ `s`) không được chép sang destination mới —
+   xem `docs/REALTIME_WEBSOCKET_MIGRATION.md`.
 8. Hai tiền tố `/v1/auth` và `/v1/password` cùng trỏ tới bộ controller auth.
 
 ## 5. Transaction
@@ -130,4 +133,4 @@ Toàn bộ giá trị nhạy cảm lấy từ biến môi trường, trùng tên
 1. Kết nối DB → 2. Kết nối Redis → 3. Verify SMTP (lỗi chỉ log, **không** chặn khởi động) →
 4. `AuthorizationSeeder` (permissions → roles → role_permission, idempotent) →
 5. `AdminInitializer` (tạo tài khoản từ `INIT_ADMIN_*` nếu chưa có + gán role ADMIN) →
-6. Mở HTTP + Socket.IO.
+6. Mở HTTP (REST + WebSocket `/ws` dùng chung Tomcat).

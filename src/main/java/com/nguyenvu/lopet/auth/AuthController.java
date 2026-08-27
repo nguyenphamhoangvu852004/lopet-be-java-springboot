@@ -1,5 +1,7 @@
 package com.nguyenvu.lopet.auth;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -9,7 +11,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.nguyenvu.lopet.auth.dto.LoginRequest;
 import com.nguyenvu.lopet.auth.dto.LoginResponse;
-import com.nguyenvu.lopet.auth.dto.RefreshTokenRequest;
 import com.nguyenvu.lopet.auth.dto.RefreshTokenResponse;
 import com.nguyenvu.lopet.auth.dto.RegisterRequest;
 import com.nguyenvu.lopet.auth.dto.RegisterResponse;
@@ -20,49 +21,63 @@ import com.nguyenvu.lopet.auth.dto.VerifyAccountResponse;
 import com.nguyenvu.lopet.common.response.ApiResponse;
 import com.nguyenvu.lopet.common.response.HttpStatusMessage;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
-/**
- * Bên TS cùng một router được mount HAI lần: {@code router.use('/auth', authRouter)} và
- * {@code router.use('/password', authRouter)}. Cả bốn endpoint vì thế tồn tại dưới cả hai tiền tố,
- * và client hiện tại đang gọi cả hai — nên {@code @RequestMapping} phải liệt kê đủ.
- */
+@Tag(name = "Authentication management", description = "APIs for managing user identity")
 @RestController
-@RequestMapping({"/v1/auth", "/v1/password"})
+@RequestMapping("")
 @RequiredArgsConstructor
 public class AuthController {
 
     private final AuthService authService;
+    private final RefreshTokenCookie refreshTokenCookie;
 
-    @PostMapping("/login")
-    public ApiResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
-        return ApiResponse.ok(HttpStatusMessage.OK, authService.login(request));
+    /**
+     * Refresh token ra bằng cookie {@code HttpOnly} chứ không nằm trong body: body đi qua tay
+     * JavaScript của client (và thường dừng lại ở {@code localStorage}), nên một lỗ XSS ở đó là mất
+     * luôn khả năng gia hạn phiên. Access token vẫn trả trong body vì client phải tự gắn nó vào
+     * header {@code Authorization} cho mọi request.
+     */
+    @Operation(summary = "Login", description = "API allow user login into system. Refresh token is returned as an HttpOnly cookie, not in the response body")
+    @PostMapping("/v1/auth/login")
+    public ApiResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request,
+                                            HttpServletResponse response) {
+        IssuedTokens tokens = authService.login(request);
+        refreshTokenCookie.write(response, tokens.refreshToken());
+        return ApiResponse.ok(HttpStatusMessage.OK, new LoginResponse(tokens.id(), tokens.accessToken()));
     }
 
     /**
-     * Cố ý KHÔNG mang {@link com.nguyenvu.lopet.security.Auth}: người gọi tới đây chính vì access
-     * token của họ đã hết hạn. Refresh token nằm trong body, không phải header Authorization —
-     * {@link com.nguyenvu.lopet.security.jwt.JwtAuthenticationFilter} vì thế bỏ qua nó, và access
-     * token cũ (dù còn hạn hay không) không ảnh hưởng gì tới kết quả.
+     * Không nhận body: refresh token chỉ đến từ cookie, vì đó là bản duy nhất client còn giữ sau khi
+     * đăng nhập. Endpoint tự ghi đè cookie bằng token vừa xoay vòng.
      */
-    @PostMapping("/refresh")
-    public ApiResponse<RefreshTokenResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
-        return ApiResponse.ok(HttpStatusMessage.OK, authService.refresh(request));
+    @Operation(summary = "Get new Access Token", description = "API used to create a new access token by using the refresh token cookie")
+    @PostMapping("/v1/auth/refresh")
+    public ApiResponse<RefreshTokenResponse> refresh(HttpServletRequest request,
+                                                     HttpServletResponse response) {
+        IssuedTokens tokens = authService.refresh(refreshTokenCookie.read(request));
+        refreshTokenCookie.write(response, tokens.refreshToken());
+        return ApiResponse.ok(HttpStatusMessage.OK, new RefreshTokenResponse(tokens.id(), tokens.accessToken()));
     }
 
-    @PostMapping("/signup")
+    @Operation(summary = "Register new Account",description = "API create new account")
+    @PostMapping("/v1/auth/signup")
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<RegisterResponse> register(@Valid @RequestBody RegisterRequest request) {
         return ApiResponse.created(HttpStatusMessage.CREATED, authService.register(request));
     }
 
-    @PostMapping("/verify")
+    @Operation(summary = "Verify the OTP sent to email", description = "API used before any behavior that need verify OTP. Verify the OTP for any next step required")
+    @PostMapping("/v1/auth/verify")
     public ApiResponse<VerifyAccountResponse> verifyAccount(@RequestBody VerifyAccountRequest request) {
         return ApiResponse.ok(HttpStatusMessage.OK, authService.verifyAccount(request));
     }
 
-    @PostMapping("/reset")
+    @Operation(summary = "Forget password", description = "API used to reset a forgot password. Need to be verify OTP before use this API")
+    @PostMapping("/v1/password/reset")
     public ApiResponse<ResetPasswordResponse> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         return ApiResponse.ok(HttpStatusMessage.OK, authService.resetPassword(request));
     }

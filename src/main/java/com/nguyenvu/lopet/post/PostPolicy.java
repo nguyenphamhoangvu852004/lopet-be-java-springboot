@@ -44,29 +44,25 @@ public class PostPolicy {
      * đáng lẽ thuộc nhóm thành bài cá nhân scope PUBLIC, tức là đẩy nội dung người dùng tưởng đang
      * đăng trong nhóm ra ngoài công khai.
      *
-     * <p>Tư cách thành viên xét theo PET đang đăng, không theo tài khoản: sau khi khoá chính của
-     * {@code group_members} thành {@code (group_id, pet_id)}, "chủ của tôi có trong nhóm" không còn
-     * là câu trả lời hợp lệ cho "tôi có được đăng vào nhóm này không".
-     *
      * <p><b>Đăng bài đòi thành viên ACTIVE ở CẢ HAI loại nhóm</b>, không riêng PRIVATE. Trước đây
      * nhóm PUBLIC cho bất kỳ ai đã đăng nhập đăng bài vào, nên nút "tham gia nhóm" chẳng thay đổi
      * điều gì. Đọc, thích và bình luận bài của nhóm PUBLIC vẫn mở cho mọi người kể cả khách — chỉ
      * hành động ĐĂNG mới là hành động của thành viên. Hàng PENDING (vừa xin vào, hoặc được mời chưa
-     * trả lời) không phải thành viên, nên phải tra bằng {@code findActiveByGroupIdAndPetId}.
+     * trả lời) không phải thành viên, nên phải tra bằng {@code findActiveByGroupIdAndAccountId}.
      *
      * <p>Người ngoài đăng vào group → 403 chứ không phải 404: sự tồn tại của group vốn đã công khai
      * qua {@code GET /v1/groups/:id}, nên che giấu ở đây không giấu được gì mà chỉ làm client khó
      * hiểu lỗi. Khác với bài viết — ở đó 404 là bắt buộc vì id bài là thứ duy nhất cần đoán để dò
      * nội dung riêng tư.
      */
-    public Group resolveGroupForPost(Integer groupId, Integer petId) {
+    public Group resolveGroupForPost(Integer groupId, Integer accountId) {
         Group group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new NotFoundException("Không tìm thấy nhóm"));
 
-        if (groupMemberRepository.findActiveByGroupIdAndPetId(group.getId(), petId).isEmpty()) {
+        if (groupMemberRepository.findActiveByGroupIdAndAccountId(group.getId(), accountId).isEmpty()) {
             throw new ForbiddenException(group.getType() == GroupType.PRIVATE
-                    ? "Thú cưng này không phải thành viên của nhóm"
-                    : "Thú cưng phải tham gia nhóm trước khi đăng bài");
+                    ? "Bạn không phải thành viên của nhóm này"
+                    : "Bạn phải tham gia nhóm trước khi đăng bài");
         }
         return group;
     }

@@ -17,10 +17,6 @@ import com.nguyenvu.lopet.role.entity.RoleName;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-/**
- * Bản dịch của {@code InitAdmin}: tạo tài khoản từ {@code INIT_ADMIN_*} nếu chưa có, rồi gán role
- * ADMIN cho nó (gán lại mỗi lần khởi động, kể cả khi tài khoản đã tồn tại).
- */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -40,7 +36,7 @@ public class AdminInitializer {
     private String password;
 
     @Transactional
-    public void init() {
+    public void execute() {
         // Cấu hình trống (môi trường test) thì bỏ qua thay vì tạo tài khoản rỗng rồi vỡ ràng buộc
         // unique — bản TS không gặp nhánh này vì .env luôn có sẵn ba biến.
         if (email.isBlank() || username.isBlank() || password.isBlank()) {

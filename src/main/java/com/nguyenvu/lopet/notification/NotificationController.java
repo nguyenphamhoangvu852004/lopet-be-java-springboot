@@ -37,8 +37,8 @@ public class NotificationController {
         NotificationDtos.CreateNotificationResponse response = notificationService.create(
                 CurrentUser.require().id(), request.receptorId(), request.content(), request.objectType());
 
-        realtimeGateway.emit(RealtimeGateway.userRoom(response.receptorId()),
-                RealtimeGateway.EVENT_NOTIFICATION,
+        realtimeGateway.emit(
+                RealtimeGateway.userTopic(response.receptorId(), RealtimeGateway.CHANNEL_NOTIFICATION),
                 new NotificationDtos.NotificationEvent(response.notificationId(), response.actorId(),
                         response.receptorId(), response.content(), response.objectType(),
                         response.objectId(), response.status(), response.createdAt()));
@@ -71,8 +71,9 @@ public class NotificationController {
         NotificationDtos.UpdateNotificationResponse response =
                 notificationService.updateStatus(id, request.status());
 
-        // Phòng object_<id> chứ không phải phòng người dùng — giữ đúng bản gốc
-        realtimeGateway.emit(RealtimeGateway.objectRoom(id), RealtimeGateway.EVENT_CHANGE_STATUS, response);
+        // Destination của chính thông báo chứ không phải của người dùng — giữ đúng bản gốc
+        // (phòng object_<id>): ai đang mở thông báo đó cũng nghe được, không riêng người nhận.
+        realtimeGateway.emit(RealtimeGateway.notificationTopic(id), response);
 
         return ApiResponse.ok("Update notification status successfully", response);
     }

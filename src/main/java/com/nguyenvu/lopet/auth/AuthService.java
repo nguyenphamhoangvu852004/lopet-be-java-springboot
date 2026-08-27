@@ -9,9 +9,6 @@ import org.springframework.transaction.annotation.Transactional;
 import com.nguyenvu.lopet.account.entity.Account;
 import com.nguyenvu.lopet.account.repository.AccountRepository;
 import com.nguyenvu.lopet.auth.dto.LoginRequest;
-import com.nguyenvu.lopet.auth.dto.LoginResponse;
-import com.nguyenvu.lopet.auth.dto.RefreshTokenRequest;
-import com.nguyenvu.lopet.auth.dto.RefreshTokenResponse;
 import com.nguyenvu.lopet.auth.dto.RegisterRequest;
 import com.nguyenvu.lopet.auth.dto.RegisterResponse;
 import com.nguyenvu.lopet.auth.dto.ResetPasswordRequest;
@@ -47,7 +44,7 @@ public class AuthService {
      * <p>Tài khoản bị khoá trả 400 (không phải 403) — đó là hành vi hiện tại của backend.
      */
     @Transactional(readOnly = true)
-    public LoginResponse login(LoginRequest request) {
+    public IssuedTokens login(LoginRequest request) {
         Account account = accountRepository.findDetailByUsername(request.username())
                 .orElseThrow(() -> new NotFoundException("No user found"));
 
@@ -59,7 +56,7 @@ public class AuthService {
         }
 
         UserPrincipal payload = new UserPrincipal(account.getId(), account.getEmail(), rolesOf(account));
-        return new LoginResponse(account.getId(),
+        return new IssuedTokens(account.getId(),
                 jwtService.generateAccessToken(payload),
                 jwtService.generateRefreshToken(payload));
     }
@@ -87,10 +84,16 @@ public class AuthService {
      * </ul>
      */
     @Transactional(readOnly = true)
-    public RefreshTokenResponse refresh(RefreshTokenRequest request) {
+    public IssuedTokens refresh(String refreshToken) {
+        if (refreshToken == null || refreshToken.isBlank()) {
+            // Thiếu cookie và cookie hỏng về cùng một mã: với client thì cả hai đều nghĩa là "phiên
+            // không còn, đăng nhập lại", và tách ra chỉ nói cho người dò biết họ đoán sai ở bước nào.
+            throw new UnauthorizedException("Refresh token không hợp lệ");
+        }
+
         UserPrincipal claims;
         try {
-            claims = jwtService.parseRefreshToken(request.refreshToken());
+            claims = jwtService.parseRefreshToken(refreshToken);
         } catch (JwtException exception) {
             // Gộp "hết hạn" và "sai chữ ký" về cùng một mã: cả hai đều kết thúc phiên, và phân biệt
             // ra ngoài chỉ giúp người dò token biết mình đoán đúng khoá hay chưa.
@@ -111,7 +114,7 @@ public class AuthService {
         }
 
         UserPrincipal payload = new UserPrincipal(account.getId(), account.getEmail(), rolesOf(account));
-        return new RefreshTokenResponse(account.getId(),
+        return new IssuedTokens(account.getId(),
                 jwtService.generateAccessToken(payload),
                 jwtService.generateRefreshToken(payload));
     }

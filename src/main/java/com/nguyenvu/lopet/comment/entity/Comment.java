@@ -7,8 +7,8 @@ import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.annotations.SQLRestriction;
 
+import com.nguyenvu.lopet.account.entity.Account;
 import com.nguyenvu.lopet.common.entity.BaseEntity;
-import com.nguyenvu.lopet.pet.entity.Pet;
 import com.nguyenvu.lopet.post.entity.Post;
 
 import jakarta.persistence.CascadeType;
@@ -64,12 +64,8 @@ public class Comment extends BaseEntity {
     @OnDelete(action = OnDeleteAction.CASCADE)
     private Post post;
 
-    /**
-     * Tác giả bình luận là một THÚ CƯNG. NOT NULL như cột {@code account_id} cũ — script di trú xoá
-     * hẳn những bình luận không quy được về pet nào thay vì để cột rỗng.
-     */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "pet_id", nullable = false)
+    @JoinColumn(name = "account_id", nullable = false)
     @OnDelete(action = OnDeleteAction.CASCADE)
-    private Pet pet;
+    private Account account;
 }

@@ -15,15 +15,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 
-/**
- * Đọc token nếu có và nạp danh tính vào SecurityContext. Filter này KHÔNG tự từ chối request:
- * việc "route này có bắt buộc đăng nhập không" do {@link com.nguyenvu.lopet.security.AuthInterceptor}
- * quyết theo annotation {@link com.nguyenvu.lopet.security.Auth}, đúng như bên Express nơi
- * {@code verifyToken()} / {@code optionalAuth()} được gắn theo từng route chứ không toàn cục.
- *
- * <p>Kết quả giải mã được để lại ở request attribute để interceptor phân biệt ba trạng thái:
- * không có token / token hỏng / token hợp lệ — ba trạng thái này cho ba mã lỗi khác nhau.
- */
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -68,11 +59,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
     }
 
-    /**
-     * Giữ nguyên cách tách của TS: {@code req.header('Authorization')?.split(' ')[1]}. Header không
-     * có khoảng trắng (thiếu tiền tố "Bearer") cho ra {@code undefined} — tức là coi như KHÔNG có
-     * token, dẫn tới 400 "Token not found" chứ không phải 401.
-     */
     private String extractToken(HttpServletRequest request) {
         String header = request.getHeader("Authorization");
         if (header == null) {

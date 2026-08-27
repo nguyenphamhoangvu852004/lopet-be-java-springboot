@@ -32,7 +32,7 @@ Trạng thái: `TODO` | `WIP` | `DONE` (chỉ đánh `DONE` sau khi đã verify 
 | 19 | FriendShip | `modules/friendShip/**` | `friendship/**` | DONE |
 | 20 | Message (chat 1-1) | `modules/message/**` | `message/**` | DONE |
 | 21 | Notification | `modules/notification/**` | `notification/**` | DONE |
-| 22 | Realtime Socket.IO | `middlewares/socketio.ts`, `res.io` | `realtime/**` (netty-socketio) | DONE |
+| 22 | Realtime | `middlewares/socketio.ts`, `res.io` | `realtime/**` (STOMP over WebSocket) | ĐỔI GIAO THỨC |
 | 23 | Report | `modules/report/**` | `report/**` | DONE |
 | 24 | Advertisement | `modules/advertisement/**` | `advertisement/**` | DONE |
 | 25 | Advertiser profile | `modules/advertiser/**` | `advertiser/**` | DONE |
@@ -158,7 +158,8 @@ không phân biệt được → chống dò id.
 * `updateStatus` chấp nhận `SENT|DELIVERED|READ`, khác → 400 `Invalid status: <x>`.
 * `findById` dùng `withDeleted: true` (đọc được cả bản ghi đã soft-delete).
 * Không endpoint nào kiểm người gọi có phải `receptor` — giữ nguyên (đây là hành vi hiện tại).
-* Socket: xem API §15.
+* Realtime: xem API §15 và `docs/REALTIME_WEBSOCKET_MIGRATION.md` — giao thức đã đổi sang STOMP,
+  frontend phải viết lại phần này.
 
 ### 24–25. Quảng cáo
 

@@ -8,23 +8,11 @@ import java.util.stream.Stream;
 
 import com.nguyenvu.lopet.role.entity.RoleName;
 
-/**
- * Danh mục permission — nguồn sự thật duy nhất, bản dịch nguyên vẹn của
- * {@code src/authz/permission.catalog.ts}.
- *
- * <p>Bảng {@code permissions}/{@code role_permission} được seed từ đúng file này để có thể truy
- * vấn/hiển thị, nhưng bản trong code mới là bản dùng để quyết định ở runtime: versioned theo git,
- * test được, và không cần invalidate cache.
- */
+
 public final class PermissionCatalog {
 
-    /** Ký tự đại diện: ADMIN có toàn quyền, không phải liệt kê tay */
     public static final String WILDCARD = "*";
 
-    /**
-     * Quyền của MỌI tài khoản đã đăng nhập. Đây là chỗ thay thế cho role 'USER' cũ: USER không phân
-     * biệt được gì cả vì nó bằng đúng "đã xác thực", nên nó là baseline chứ không phải một role.
-     */
     public static final List<PermissionDef> BASELINE_PERMISSIONS = List.of(
             PermissionDef.of("post:create", "Đăng bài"),
             PermissionDef.of("post:update:own", "Sửa bài của chính mình"),
@@ -36,17 +24,6 @@ public final class PermissionCatalog {
             PermissionDef.of("group:delete:own", "Xoá nhóm mình làm chủ"),
             PermissionDef.of("report:create", "Gửi báo cáo"),
             PermissionDef.of("accountProfile:update:own", "Sửa hồ sơ chủ tài khoản của chính mình"),
-            // Bốn quyền pet chỉ là tầng 1. Tầng 2 là sở hữu, tra `pets.account_id` — xem PetAccessGuard.
-            // Cố ý KHÔNG có mã `pet:delete` cho staff: chưa có luồng kiểm duyệt nào cần xoá thú cưng
-            // của người khác.
-            //
-            // `pet:*` là thông tin sinh học của con vật, `petProfile:*` là thứ hiện ra ngoài mạng xã
-            // hội. Tách hai mã vì sau này chúng phân kỳ: kiểm duyệt cần khoá được HỒ SƠ CÔNG KHAI
-            // (đổi tên hiển thị, ẩn bio) mà không đụng tới dữ liệu sinh học.
-            PermissionDef.of("pet:create", "Tạo thú cưng"),
-            PermissionDef.of("pet:update:own", "Sửa thông tin thú cưng mình sở hữu"),
-            PermissionDef.of("pet:delete:own", "Ngừng hoạt động thú cưng mình sở hữu"),
-            PermissionDef.of("petProfile:update:own", "Sửa hồ sơ công khai của thú cưng mình sở hữu"),
             PermissionDef.of("friendship:manage:own", "Quản lý kết bạn của chính mình"),
             // Ba quyền ads dưới đây mới chỉ là điều kiện cần. Điều kiện đủ là tài khoản phải có
             // advertiser_profile ở trạng thái APPROVED — tầng capability kiểm.
@@ -79,7 +56,6 @@ public final class PermissionCatalog {
                     "account:ban", "ads:review", "advertiser:read"),
             RoleName.SUPPORT, List.of("account:read", "report:read", "advertiser:read"));
 
-    /** Tập quyền hiệu lực của một tài khoản = baseline + quyền của các role đang giữ */
     public static Set<String> resolvePermissions(List<String> roles) {
         Set<String> granted = new HashSet<>();
         BASELINE_PERMISSIONS.forEach(permission -> granted.add(permission.code()));
@@ -92,8 +68,6 @@ public final class PermissionCatalog {
             try {
                 roleName = RoleName.valueOf(role);
             } catch (IllegalArgumentException ignored) {
-                // Role lạ trong token (ví dụ token cũ mang role đã bị bỏ) chỉ đơn giản là không cấp
-                // thêm quyền nào — giống `if (!list) continue` bên TS, không phải lỗi.
                 continue;
             }
             granted.addAll(ROLE_PERMISSIONS.getOrDefault(roleName, List.of()));
@@ -101,7 +75,6 @@ public final class PermissionCatalog {
         return granted;
     }
 
-    /** Có {@code *} thì qua tất; ngoài ra chấp nhận {@code resource:*} */
     public static boolean hasPermission(Set<String> granted, String required) {
         if (granted.contains(WILDCARD) || granted.contains(required)) {
             return true;

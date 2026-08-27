@@ -135,10 +135,10 @@ class AccountProfileRefactorIntegrationTest extends IntegrationTestBase {
         void chiDoiTruongDuocGui() {
             Integer accountId = register("merge-user");
             profileService.updateMine(accountId, "Tên Ban Đầu", "0900000000", "Bio ban đầu",
-                    null, null, LocalDate.of(2000, 1, 15), "Đà Nẵng", 1);
+                    null, null, LocalDate.of(2000, 1, 15), "Đà Nẵng", 1, null);
 
             AccountProfileDtos.ProfileEntity sau = profileService.updateMine(accountId, "Tên Mới",
-                    null, null, null, null, null, null, null);
+                    null, null, null, null, null, null, null, null);
 
             assertThat(sau.fullName()).isEqualTo("Tên Mới");
             assertThat(sau.bio()).isEqualTo("Bio ban đầu");
@@ -153,10 +153,10 @@ class AccountProfileRefactorIntegrationTest extends IntegrationTestBase {
         void chuoiRongVanGhiDe() {
             Integer accountId = register("clear-bio");
             profileService.updateMine(accountId, null, null, "Bio sẽ bị xoá",
-                    null, null, null, null, null);
+                    null, null, null, null, null, null);
 
             AccountProfileDtos.ProfileEntity sau = profileService.updateMine(accountId, null, null, "",
-                    null, null, null, null, null);
+                    null, null, null, null, null, null);
 
             assertThat(sau.bio()).isEmpty();
         }
@@ -170,11 +170,11 @@ class AccountProfileRefactorIntegrationTest extends IntegrationTestBase {
         void khongDinhFileThiGiuNguyenAnh() {
             Integer accountId = register("keep-avatar");
             profileService.updateMine(accountId, null, null, null,
-                    "https://cdn.local/avatar.png", "https://cdn.local/cover.png", null, null, null);
+                    "https://cdn.local/avatar.png", "https://cdn.local/cover.png", null, null, null, null);
 
             // Đúng thứ controller truyền xuống khi người dùng chỉ sửa bio: hai trường ảnh là null
             AccountProfileDtos.ProfileEntity sau = profileService.updateMine(accountId, null, null,
-                    "Chỉ sửa bio thôi", null, null, null, null, null);
+                    "Chỉ sửa bio thôi", null, null, null, null, null, null);
 
             assertThat(sau.avatarUrl()).isEqualTo("https://cdn.local/avatar.png");
             assertThat(sau.coverUrl()).isEqualTo("https://cdn.local/cover.png");
@@ -197,9 +197,9 @@ class AccountProfileRefactorIntegrationTest extends IntegrationTestBase {
             Integer nanNhan = register("victim");
             Integer keLa = register("stranger");
             profileService.updateMine(nanNhan, "Hồ sơ nạn nhân", null, "Bio nạn nhân",
-                    "https://cdn.local/victim.png", null, null, null, null);
+                    "https://cdn.local/victim.png", null, null, null, null, null);
 
-            profileService.updateMine(keLa, "Hồ sơ kẻ lạ", null, "Bio kẻ lạ", null, null, null, null, null);
+            profileService.updateMine(keLa, "Hồ sơ kẻ lạ", null, "Bio kẻ lạ", null, null, null, null, null, null);
 
             AccountProfileDtos.ProfileSummary cuaNanNhan = profileService.findByAccountId(nanNhan);
             assertThat(cuaNanNhan.fullName()).isEqualTo("Hồ sơ nạn nhân");
@@ -226,7 +226,7 @@ class AccountProfileRefactorIntegrationTest extends IntegrationTestBase {
         @DisplayName("GET /me trả đúng hồ sơ của người gọi, không cần biết profileId")
         void traDungHoSoCuaNguoiGoi() {
             Integer accountId = register("read-me");
-            profileService.updateMine(accountId, "Tên hiển thị", null, null, null, null, null, null, null);
+            profileService.updateMine(accountId, "Tên hiển thị", null, null, null, null, null, null, null, null);
 
             AccountProfileDtos.ProfileSummary cuaToi = profileService.findByAccountId(accountId);
 
@@ -239,7 +239,7 @@ class AccountProfileRefactorIntegrationTest extends IntegrationTestBase {
         @DisplayName("tài khoản không có hồ sơ thì cập nhật báo lỗi chỉ rõ cần backfill")
         void thieuHoSoThiBaoLoiRoRang() {
             assertThatThrownBy(() -> profileService.updateMine(-1, "x", null, null,
-                    null, null, null, null, null))
+                    null, null, null, null, null, null))
                     .isInstanceOf(NotFoundException.class)
                     .hasMessageContaining("backfill");
         }

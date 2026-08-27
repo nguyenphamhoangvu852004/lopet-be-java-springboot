@@ -42,18 +42,18 @@ public enum NotificationObjectType {
     FRIEND_ACCEPTED,
 
     /**
-     * Một thú cưng xin vào nhóm PRIVATE — người nhận là quản trị nhóm (OWNER/ADMIN).
+     * Ai đó xin vào nhóm PRIVATE — người nhận là quản trị nhóm (OWNER/ADMIN).
      *
-     * <p>{@code objectId} là id NHÓM, không phải id pet xin vào: đích đến là hộp thư yêu cầu của
-     * nhóm, và pet nào xin thì đọc từ {@code actorId}. Nhóm PUBLIC không sinh loại này vì vào nhóm
+     * <p>{@code objectId} là id NHÓM, không phải id người xin vào: đích đến là hộp thư yêu cầu của
+     * nhóm, và ai xin thì đọc từ {@code actorId}. Nhóm PUBLIC không sinh loại này vì vào nhóm
      * PUBLIC không cần ai duyệt.
      */
     GROUP_JOIN_REQUESTED,
 
-    /** Yêu cầu vào nhóm được duyệt — người nhận là chủ của pet đã xin vào */
+    /** Yêu cầu vào nhóm được duyệt — người nhận là người đã xin vào */
     GROUP_JOIN_APPROVED,
 
-    /** Ai đó mời thú cưng của người nhận vào nhóm; chờ chính người nhận trả lời */
+    /** Ai đó mời người nhận vào nhóm; chờ chính người nhận trả lời */
     GROUP_INVITED,
 
     /** Lời mời vào nhóm được chấp nhận — người nhận là người ĐÃ MỜI */

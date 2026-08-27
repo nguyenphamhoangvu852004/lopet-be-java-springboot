@@ -11,24 +11,26 @@ import org.springframework.data.repository.query.Param;
 import com.nguyenvu.lopet.post.entity.Post;
 
 /**
- * Mọi hàm đọc danh sách đều nhận {@code viewerId} + {@code viewerPetId} và lọc theo
- * {@link PostVisibility} — không có đường nào trả về bài viết mà bỏ qua bước lọc, trừ
- * {@link #findByIdInternal(Integer)} (xem ghi chú ở đó).
+ * Mọi hàm đọc danh sách đều nhận {@code viewerId} và lọc theo {@link PostVisibility} — không có
+ * đường nào trả về bài viết mà bỏ qua bước lọc, trừ {@link #findByIdInternal(Integer)} (xem ghi chú ở đó).
  *
- * <p>Chiến lược nạp: {@code pet} (kèm {@code petProfile}), {@code group}, {@code postMedias} được
- * fetch join; còn {@code postLikes} (và {@code postLikes.pet}) để lazy + batch fetch. Fetch join cả
- * hai collection cùng lúc sẽ nhân bản hàng (media × like) đúng như bản TS đang làm; kết quả sau khử
+ * <p>Chiến lược nạp: {@code account}, {@code group}, {@code postMedias} được fetch join; còn
+ * {@code postLikes} (và {@code postLikes.account}) để lazy + batch fetch. Fetch join cả hai
+ * collection cùng lúc sẽ nhân bản hàng (media × like) đúng như bản TS đang làm; kết quả sau khử
  * trùng lặp là như nhau, nên tách ra vừa giữ nguyên dữ liệu trả về vừa không phình truy vấn.
- *
- * <p>{@code petProfile} nằm trong đồ thị nạp vì mọi DTO bài viết đều hiển thị tác giả bằng handle và
- * display name — để nó lazy thì mỗi bài trong danh sách sinh thêm một truy vấn.
  */
 public interface PostRepository extends JpaRepository<Post, Integer> {
 
+    /**
+     * Dùng bởi {@link com.nguyenvu.lopet.bootstrap.SeedDemoPosts} để không seed lại bài demo ở lần
+     * khởi động thứ hai. Không đi qua {@link PostVisibility} vì đây là câu hỏi về sự tồn tại, không
+     * phải về quyền xem.
+     */
+    boolean existsByAccountId(Integer accountId);
+
     String READ_GRAPH = """
             select distinct p from Post p
-            left join fetch p.pet ap
-            left join fetch ap.petProfile
+            left join fetch p.account
             left join fetch p.group g
             left join fetch p.postMedias
             """;
@@ -42,8 +44,7 @@ public interface PostRepository extends JpaRepository<Post, Integer> {
      */
     @Query("""
             select distinct p from Post p
-            left join fetch p.pet ap
-            left join fetch ap.petProfile
+            left join fetch p.account
             left join fetch p.group
             left join fetch p.postMedias
             where p.id = :id
@@ -51,9 +52,7 @@ public interface PostRepository extends JpaRepository<Post, Integer> {
     Optional<Post> findByIdInternal(@Param("id") Integer id);
 
     @Query(READ_GRAPH + " where p.id = :id and " + PostVisibility.VISIBLE_TO)
-    Optional<Post> findVisibleById(@Param("id") Integer id,
-                                   @Param("viewerId") Integer viewerId,
-                                   @Param("viewerPetId") Integer viewerPetId);
+    Optional<Post> findVisibleById(@Param("id") Integer id, @Param("viewerId") Integer viewerId);
 
     /**
      * Danh sách bài kèm bộ lọc tìm kiếm. {@code like} chứ không phải ILIKE: MySQL không có toán tử
@@ -65,33 +64,13 @@ public interface PostRepository extends JpaRepository<Post, Integer> {
              order by p.createdAt desc
             """)
     List<Post> findAllVisible(@Param("viewerId") Integer viewerId,
-                              @Param("viewerPetId") Integer viewerPetId,
                               @Param("content") String content,
                               @Param("groupId") Integer groupId);
 
-    /**
-     * Bài của MỘT thú cưng cụ thể — đơn vị tác giả thật sau khi {@code posts.account_id} thành
-     * {@code posts.pet_id}.
-     */
-    @Query(READ_GRAPH + " where ap.id = :authorPetId and " + PostVisibility.VISIBLE_TO + """
+    @Query(READ_GRAPH + " where p.account.id = :authorId and " + PostVisibility.VISIBLE_TO + """
              order by p.createdAt desc
             """)
-    List<Post> findVisibleByAuthorPet(@Param("authorPetId") Integer authorPetId,
-                                      @Param("viewerId") Integer viewerId,
-                                      @Param("viewerPetId") Integer viewerPetId);
-
-    /**
-     * Bài của TẤT CẢ thú cưng thuộc một tài khoản — giữ cho {@code GET /v1/posts/accounts/{id}} còn
-     * ý nghĩa sau khi tác giả đổi sang pet. Lọc qua {@code ap.account.id} chứ không qua một cột
-     * {@code account_id} nào trên {@code posts}: cột đó đã bị bỏ, và giữ lại một bản sao của nó sẽ
-     * tạo ra hai câu trả lời khác nhau cho cùng câu hỏi "bài này của ai" khi pet đổi chủ.
-     */
-    @Query(READ_GRAPH + " where ap.account.id = :authorAccountId and " + PostVisibility.VISIBLE_TO + """
-             order by p.createdAt desc
-            """)
-    List<Post> findVisibleByAuthorAccount(@Param("authorAccountId") Integer authorAccountId,
-                                          @Param("viewerId") Integer viewerId,
-                                          @Param("viewerPetId") Integer viewerPetId);
+    List<Post> findVisibleByAuthor(@Param("authorId") Integer authorId, @Param("viewerId") Integer viewerId);
 
     /**
      * Hai bước cho danh sách gợi ý: lấy id có giới hạn trước, rồi mới nạp chi tiết.
@@ -100,11 +79,9 @@ public interface PostRepository extends JpaRepository<Post, Integer> {
      * 1-n thì mười hàng thô không đồng nghĩa mười bài viết. Bản TS xử lý đúng vấn đề này bằng
      * {@code take(10)} thay vì {@code limit(10)}.
      */
-    @Query("select p.id from Post p left join p.group g left join p.pet ap where "
-            + PostVisibility.VISIBLE_TO + " order by p.createdAt desc")
-    List<Integer> findVisibleIds(@Param("viewerId") Integer viewerId,
-                                 @Param("viewerPetId") Integer viewerPetId,
-                                 Pageable pageable);
+    @Query("select p.id from Post p left join p.group g where " + PostVisibility.VISIBLE_TO
+            + " order by p.createdAt desc")
+    List<Integer> findVisibleIds(@Param("viewerId") Integer viewerId, Pageable pageable);
 
     @Query(READ_GRAPH + " where p.id in :ids order by p.createdAt desc")
     List<Post> findAllByIdsWithDetails(@Param("ids") List<Integer> ids);

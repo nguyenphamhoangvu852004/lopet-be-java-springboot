@@ -9,7 +9,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
@@ -90,17 +89,6 @@ public class AdvertisementController {
                 : cloudinaryService.upload(image, CloudinaryService.IMAGE);
         return ApiResponse.ok("Update advertisement successfully",
                 advertisementService.update(adsId, title, description, linkRef, imageUrl));
-    }
-
-    @PutMapping(path = "/{adsId}", consumes = MediaType.APPLICATION_JSON_VALUE)
-    @Auth
-    @RequirePermission("ads:update:own")
-    public ApiResponse<AdvertisementDtos.IdResponse> updateJson(
-            @PathVariable Integer adsId, @RequestBody AdvertisementDtos.CreateAdvertisementRequest request) {
-        advertisementAccessGuard.requireOwner(adsId);
-        return ApiResponse.ok("Update advertisement successfully",
-                advertisementService.update(adsId, request.title(), request.description(),
-                        request.linkRef(), null));
     }
 
     @DeleteMapping("/{id}")

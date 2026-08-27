@@ -1,6 +1,3 @@
-# .env TUYỆT ĐỐI không được vào image: secret phải đến từ Environment của Render lúc chạy.
-# application.yml khai `optional:file:.env[.properties]` nên thiếu file này app vẫn khởi động bình
-# thường, miễn là các biến đã có trong môi trường.
 .env
 .env.*
 *.env
@@ -16,11 +13,6 @@ target/
 *.iml
 *.iws
 *.ipr
-
-# Dockerfile gọi `mvn` của ảnh maven, không dùng wrapper.
-#mvnw
-#mvnw.cmd
-#.mvn/
 
 docs/
 scripts/

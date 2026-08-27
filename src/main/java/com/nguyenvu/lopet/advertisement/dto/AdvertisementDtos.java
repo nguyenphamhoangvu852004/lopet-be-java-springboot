@@ -27,9 +27,6 @@ public final class AdvertisementDtos {
     public record Author(Integer id, String username, String email) {
     }
 
-    public record CreateAdvertisementRequest(String title, String description, String linkRef) {
-    }
-
     public record IdResponse(Integer id) {
     }
 

@@ -1,11 +1,10 @@
 package com.nguyenvu.lopet.group;
 
-import static com.nguyenvu.lopet.security.petcontext.PetContextTestSupport.actAs;
-import static com.nguyenvu.lopet.security.petcontext.PetContextTestSupport.clear;
+import static com.nguyenvu.lopet.support.AuthTestSupport.actAs;
+import static com.nguyenvu.lopet.support.AuthTestSupport.clear;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.time.LocalDate;
 import java.util.List;
 
 import org.junit.jupiter.api.AfterEach;
@@ -31,8 +30,6 @@ import com.nguyenvu.lopet.group.entity.GroupMemberStatus;
 import com.nguyenvu.lopet.group.entity.GroupType;
 import com.nguyenvu.lopet.group.repository.GroupMemberRepository;
 import com.nguyenvu.lopet.group.repository.GroupRepository;
-import com.nguyenvu.lopet.pet.PetService;
-import com.nguyenvu.lopet.pet.dto.PetDtos;
 import com.nguyenvu.lopet.post.PostService;
 import com.nguyenvu.lopet.post.entity.PostScope;
 import com.nguyenvu.lopet.support.IntegrationTestBase;
@@ -41,8 +38,8 @@ import com.nguyenvu.lopet.support.IntegrationTestBase;
  * Cơ chế vào nhóm: tự tham gia, yêu cầu chờ duyệt, lời mời.
  *
  * <p>Chạy ở tầng SERVICE vì mọi luật ở đây nằm trong {@link GroupService} và
- * {@code PostPolicy}/{@code PostVisibility}, không nằm trong controller. Chủ thể là THÚ CƯNG nên mỗi
- * lời gọi phải đặt {@code PetContext} trước bằng {@code actAs}.
+ * {@code PostPolicy}/{@code PostVisibility}, không nằm trong controller. Danh tính người gọi vì thế
+ * phải đặt trước mỗi lời gọi bằng {@code actAs} — xem {@code AuthTestSupport}.
  *
  * <p><b>Điều được canh gắt nhất ở đây là hàng PENDING không được tính là thành viên.</b> Sau khi
  * {@code group_members} có cột {@code status}, một người ngoài TỰ tạo được hàng PENDING chỉ bằng cách
@@ -67,8 +64,6 @@ class GroupMembershipIntegrationTest extends IntegrationTestBase {
     @Autowired
     private PostService postService;
     @Autowired
-    private PetService petService;
-    @Autowired
     private AccountRepository accountRepository;
     @Autowired
     private GroupRepository groupRepository;
@@ -76,25 +71,25 @@ class GroupMembershipIntegrationTest extends IntegrationTestBase {
     private GroupMemberRepository groupMemberRepository;
 
     /** Chủ nhóm, một quản trị viên nhóm, một thành viên thường, và hai người ngoài */
-    private Integer ownerPet;
-    private Integer adminPet;
-    private Integer memberPet;
-    private Integer outsiderPet;
-    private Integer inviteePet;
+    private Integer owner;
+    private Integer admin;
+    private Integer member;
+    private Integer outsider;
+    private Integer invitee;
 
     @BeforeAll
     void seed() {
         inTransaction(() -> {
-            ownerPet = pet(account("grp-owner"));
-            adminPet = pet(account("grp-admin"));
-            memberPet = pet(account("grp-member"));
-            outsiderPet = pet(account("grp-outsider"));
-            inviteePet = pet(account("grp-invitee"));
+            owner = account("grp-owner");
+            admin = account("grp-admin");
+            member = account("grp-member");
+            outsider = account("grp-outsider");
+            invitee = account("grp-invitee");
         });
     }
 
     @AfterEach
-    void resetPetContext() {
+    void resetAuthContext() {
         clear();
     }
 
@@ -106,54 +101,48 @@ class GroupMembershipIntegrationTest extends IntegrationTestBase {
                 .email(unique + "@group.local").username(unique).password("x").isBanned(0).build()).getId();
     }
 
-    private Integer pet(Integer ownerAccountId) {
-        return petService.create(ownerAccountId, new PetDtos.CreatePetRequest(
-                "grp-pet-" + System.nanoTime(), "DOG", null, "MALE",
-                LocalDate.of(2023, 3, 12), "PUBLIC")).petId();
-    }
-
-    /** Nhóm mới, {@link #ownerPet} là OWNER và {@link #adminPet} được nâng thành ADMIN của nhóm */
+    /** Nhóm mới, {@link #owner} là OWNER và {@link #admin} được nâng thành ADMIN của nhóm */
     private Integer group(GroupType type) {
-        actAs(ownerPet);
+        actAs(owner);
         Integer groupId = groupService.create("grp-" + System.nanoTime(), type.name(), "", "").id();
 
-        actAs(adminPet);
+        actAs(admin);
         groupService.join(groupId);
         if (type == GroupType.PRIVATE) {
-            actAs(ownerPet);
-            groupService.reviewJoinRequest(groupId, adminPet, true);
+            actAs(owner);
+            groupService.reviewJoinRequest(groupId, admin, true);
         }
         inTransaction(() -> {
-            var admin = groupMemberRepository.findActiveByGroupIdAndPetId(groupId, adminPet).orElseThrow();
-            admin.setRole(GroupMemberRole.ADMIN);
-            groupMemberRepository.save(admin);
+            var row = groupMemberRepository.findActiveByGroupIdAndAccountId(groupId, admin).orElseThrow();
+            row.setRole(GroupMemberRole.ADMIN);
+            groupMemberRepository.save(row);
         });
         return groupId;
     }
 
-    /** Đưa {@link #memberPet} thành thành viên ACTIVE của nhóm, bất kể loại nhóm */
+    /** Đưa {@link #member} thành thành viên ACTIVE của nhóm, bất kể loại nhóm */
     private void joinAsMember(Integer groupId) {
-        actAs(memberPet);
+        actAs(member);
         groupService.join(groupId);
-        if (statusOf(groupId, memberPet) == GroupMemberStatus.PENDING) {
-            actAs(ownerPet);
-            groupService.reviewJoinRequest(groupId, memberPet, true);
+        if (statusOf(groupId, member) == GroupMemberStatus.PENDING) {
+            actAs(owner);
+            groupService.reviewJoinRequest(groupId, member, true);
         }
     }
 
-    private GroupMemberStatus statusOf(Integer groupId, Integer petId) {
-        return inTransaction(() -> groupMemberRepository.findByGroupIdAndPetId(groupId, petId))
+    private GroupMemberStatus statusOf(Integer groupId, Integer accountId) {
+        return inTransaction(() -> groupMemberRepository.findByGroupIdAndAccountId(groupId, accountId))
                 .map(member -> member.getStatus()).orElse(null);
     }
 
-    private Integer groupPost(Integer groupId, Integer authorPet) {
-        actAs(authorPet);
-        return postService.create("bai-" + System.nanoTime(), groupId, PostScope.PUBLIC.name(),
+    private Integer groupPost(Integer groupId, Integer authorId) {
+        actAs(authorId);
+        return postService.create(authorId, "bai-" + System.nanoTime(), groupId, PostScope.PUBLIC.name(),
                 List.of()).postId();
     }
 
-    private GroupDtos.GroupDetail detailAs(Integer groupId, Integer viewerPet) {
-        return inTransaction(() -> groupService.getById(groupId, viewerPet));
+    private GroupDtos.GroupDetail detailAs(Integer groupId, Integer viewerId) {
+        return inTransaction(() -> groupService.getById(groupId, viewerId));
     }
 
     /* ---------------------------------------------------------------- tests */
@@ -167,24 +156,24 @@ class GroupMembershipIntegrationTest extends IntegrationTestBase {
         void tu_tham_gia_active_ngay() {
             Integer groupId = group(GroupType.PUBLIC);
 
-            actAs(outsiderPet);
+            actAs(outsider);
             GroupDtos.JoinGroupResponse response = groupService.join(groupId);
 
             assertThat(response.status()).isEqualTo(GroupMemberStatus.ACTIVE);
-            assertThat(groupService.getListJoinedByPet(outsiderPet))
+            assertThat(groupService.getListJoined(outsider))
                     .extracting(GroupDtos.GroupSummary::id).contains(groupId);
-            assertThat(detailAs(groupId, outsiderPet).members())
-                    .extracting(GroupDtos.GroupMemberView::petId).contains(outsiderPet);
+            assertThat(detailAs(groupId, outsider).members())
+                    .extracting(GroupDtos.GroupMemberView::accountId).contains(outsider);
         }
 
         @Test
         @DisplayName("tham gia hai lần thì 409, không tạo hàng thứ hai")
         void tham_gia_hai_lan_thi_409() {
             Integer groupId = group(GroupType.PUBLIC);
-            actAs(outsiderPet);
+            actAs(outsider);
             groupService.join(groupId);
 
-            actAs(outsiderPet);
+            actAs(outsider);
             assertThatThrownBy(() -> groupService.join(groupId))
                     .isInstanceOf(ConflictException.class);
         }
@@ -198,20 +187,20 @@ class GroupMembershipIntegrationTest extends IntegrationTestBase {
         void muon_dang_bai_thi_phai_tham_gia() {
             Integer groupId = group(GroupType.PUBLIC);
 
-            actAs(outsiderPet);
-            assertThatThrownBy(() -> groupPost(groupId, outsiderPet))
+            actAs(outsider);
+            assertThatThrownBy(() -> groupPost(groupId, outsider))
                     .isInstanceOf(ForbiddenException.class);
 
-            actAs(outsiderPet);
+            actAs(outsider);
             groupService.join(groupId);
-            assertThat(groupPost(groupId, outsiderPet)).isPositive();
+            assertThat(groupPost(groupId, outsider)).isPositive();
         }
 
         @Test
         @DisplayName("chi tiết nhóm không bị che với người ngoài")
         void chi_tiet_khong_bi_che() {
             Integer groupId = group(GroupType.PUBLIC);
-            GroupDtos.GroupDetail detail = detailAs(groupId, outsiderPet);
+            GroupDtos.GroupDetail detail = detailAs(groupId, outsider);
 
             assertThat(detail.restricted()).isFalse();
             assertThat(detail.members()).isNotEmpty();
@@ -228,9 +217,9 @@ class GroupMembershipIntegrationTest extends IntegrationTestBase {
         void tu_tham_gia_chi_la_yeu_cau() {
             Integer groupId = group(GroupType.PRIVATE);
 
-            actAs(outsiderPet);
+            actAs(outsider);
             assertThat(groupService.join(groupId).status()).isEqualTo(GroupMemberStatus.PENDING);
-            assertThat(groupService.getListJoinedByPet(outsiderPet))
+            assertThat(groupService.getListJoined(outsider))
                     .extracting(GroupDtos.GroupSummary::id).doesNotContain(groupId);
         }
 
@@ -243,13 +232,13 @@ class GroupMembershipIntegrationTest extends IntegrationTestBase {
         void khong_thay_bai_khi_dang_cho() {
             Integer groupId = group(GroupType.PRIVATE);
             joinAsMember(groupId);
-            Integer postId = groupPost(groupId, memberPet);
+            Integer postId = groupPost(groupId, member);
 
-            actAs(outsiderPet);
+            actAs(outsider);
             groupService.join(groupId);
 
-            actAs(outsiderPet);
-            assertThatThrownBy(() -> postService.getOneById(postId, null, outsiderPet))
+            actAs(outsider);
+            assertThatThrownBy(() -> postService.getOneById(postId, outsider))
                     .isInstanceOf(NotFoundException.class);
         }
 
@@ -257,15 +246,15 @@ class GroupMembershipIntegrationTest extends IntegrationTestBase {
         @DisplayName("đang chờ duyệt thì không bị đếm vào danh sách thành viên")
         void khong_dem_vao_danh_sach() {
             Integer groupId = group(GroupType.PRIVATE);
-            int before = detailAs(groupId, ownerPet).totalMembers();
+            int before = detailAs(groupId, owner).totalMembers();
 
-            actAs(outsiderPet);
+            actAs(outsider);
             groupService.join(groupId);
 
-            GroupDtos.GroupDetail detail = detailAs(groupId, ownerPet);
+            GroupDtos.GroupDetail detail = detailAs(groupId, owner);
             assertThat(detail.totalMembers()).isEqualTo(before);
             assertThat(detail.members())
-                    .extracting(GroupDtos.GroupMemberView::petId).doesNotContain(outsiderPet);
+                    .extracting(GroupDtos.GroupMemberView::accountId).doesNotContain(outsider);
         }
 
         @Test
@@ -273,18 +262,18 @@ class GroupMembershipIntegrationTest extends IntegrationTestBase {
         void duyet_thi_thanh_thanh_vien() {
             Integer groupId = group(GroupType.PRIVATE);
             joinAsMember(groupId);
-            Integer postId = groupPost(groupId, memberPet);
+            Integer postId = groupPost(groupId, member);
 
-            actAs(outsiderPet);
+            actAs(outsider);
             groupService.join(groupId);
-            actAs(ownerPet);
-            groupService.reviewJoinRequest(groupId, outsiderPet, true);
+            actAs(owner);
+            groupService.reviewJoinRequest(groupId, outsider, true);
 
-            assertThat(statusOf(groupId, outsiderPet)).isEqualTo(GroupMemberStatus.ACTIVE);
-            actAs(outsiderPet);
-            assertThat(inTransaction(() -> postService.getOneById(postId, null, outsiderPet)))
+            assertThat(statusOf(groupId, outsider)).isEqualTo(GroupMemberStatus.ACTIVE);
+            actAs(outsider);
+            assertThat(inTransaction(() -> postService.getOneById(postId, outsider)))
                     .isNotNull();
-            assertThat(groupPost(groupId, outsiderPet)).isPositive();
+            assertThat(groupPost(groupId, outsider)).isPositive();
         }
 
         @Test
@@ -292,26 +281,26 @@ class GroupMembershipIntegrationTest extends IntegrationTestBase {
         void tu_choi_thi_xin_lai_duoc() {
             Integer groupId = group(GroupType.PRIVATE);
 
-            actAs(outsiderPet);
+            actAs(outsider);
             groupService.join(groupId);
-            actAs(ownerPet);
-            groupService.reviewJoinRequest(groupId, outsiderPet, false);
-            assertThat(statusOf(groupId, outsiderPet)).isNull();
+            actAs(owner);
+            groupService.reviewJoinRequest(groupId, outsider, false);
+            assertThat(statusOf(groupId, outsider)).isNull();
 
-            actAs(outsiderPet);
+            actAs(outsider);
             assertThat(groupService.join(groupId).status()).isEqualTo(GroupMemberStatus.PENDING);
         }
 
         @Test
-        @DisplayName("pet tự huỷ được yêu cầu của mình")
+        @DisplayName("tự huỷ được yêu cầu của mình")
         void tu_huy_yeu_cau() {
             Integer groupId = group(GroupType.PRIVATE);
-            actAs(outsiderPet);
+            actAs(outsider);
             groupService.join(groupId);
 
-            actAs(outsiderPet);
+            actAs(outsider);
             groupService.cancelJoinRequest(groupId);
-            assertThat(statusOf(groupId, outsiderPet)).isNull();
+            assertThat(statusOf(groupId, outsider)).isNull();
         }
 
         @Test
@@ -320,20 +309,20 @@ class GroupMembershipIntegrationTest extends IntegrationTestBase {
             Integer groupId = group(GroupType.PRIVATE);
             joinAsMember(groupId);
 
-            GroupDtos.GroupDetail asOutsider = detailAs(groupId, outsiderPet);
+            GroupDtos.GroupDetail asOutsider = detailAs(groupId, outsider);
             assertThat(asOutsider.restricted()).isTrue();
             assertThat(asOutsider.members()).isEmpty();
             // Metadata vẫn còn: không có nó thì không có đường nào tìm ra nhóm mà xin vào
             assertThat(asOutsider.name()).isNotBlank();
             assertThat(asOutsider.totalMembers()).isPositive();
 
-            GroupDtos.GroupDetail asMember = detailAs(groupId, memberPet);
+            GroupDtos.GroupDetail asMember = detailAs(groupId, member);
             assertThat(asMember.restricted()).isFalse();
             assertThat(asMember.members()).isNotEmpty();
         }
 
         @Test
-        @DisplayName("khách chưa chọn pet cũng bị che")
+        @DisplayName("khách chưa đăng nhập cũng bị che")
         void khach_cung_bi_che() {
             Integer groupId = group(GroupType.PRIVATE);
             GroupDtos.GroupDetail detail = detailAs(groupId, null);
@@ -346,17 +335,17 @@ class GroupMembershipIntegrationTest extends IntegrationTestBase {
         @DisplayName("viewerStatus phản ánh đúng ba trạng thái")
         void viewer_status_dung() {
             Integer groupId = group(GroupType.PRIVATE);
-            assertThat(detailAs(groupId, outsiderPet).viewerStatus())
+            assertThat(detailAs(groupId, outsider).viewerStatus())
                     .isEqualTo(GroupDtos.ViewerStatus.NONE);
 
-            actAs(outsiderPet);
+            actAs(outsider);
             groupService.join(groupId);
-            assertThat(detailAs(groupId, outsiderPet).viewerStatus())
+            assertThat(detailAs(groupId, outsider).viewerStatus())
                     .isEqualTo(GroupDtos.ViewerStatus.PENDING_REQUEST);
 
-            actAs(ownerPet);
-            groupService.reviewJoinRequest(groupId, outsiderPet, true);
-            assertThat(detailAs(groupId, outsiderPet).viewerStatus())
+            actAs(owner);
+            groupService.reviewJoinRequest(groupId, outsider, true);
+            assertThat(detailAs(groupId, outsider).viewerStatus())
                     .isEqualTo(GroupDtos.ViewerStatus.MEMBER);
         }
     }
@@ -371,15 +360,15 @@ class GroupMembershipIntegrationTest extends IntegrationTestBase {
             Integer groupId = group(GroupType.PRIVATE);
             joinAsMember(groupId);
 
-            actAs(outsiderPet);
+            actAs(outsider);
             groupService.join(groupId);
 
-            actAs(memberPet);
-            assertThatThrownBy(() -> groupService.reviewJoinRequest(groupId, outsiderPet, true))
+            actAs(member);
+            assertThatThrownBy(() -> groupService.reviewJoinRequest(groupId, outsider, true))
                     .isInstanceOf(ForbiddenException.class);
 
-            actAs(adminPet);
-            assertThat(groupService.reviewJoinRequest(groupId, outsiderPet, true).status())
+            actAs(admin);
+            assertThat(groupService.reviewJoinRequest(groupId, outsider, true).status())
                     .isEqualTo(GroupMemberStatus.ACTIVE);
         }
 
@@ -389,16 +378,16 @@ class GroupMembershipIntegrationTest extends IntegrationTestBase {
             Integer groupId = group(GroupType.PRIVATE);
             joinAsMember(groupId);
 
-            actAs(outsiderPet);
+            actAs(outsider);
             groupService.join(groupId);
-            // memberPet mời inviteePet — hàng PENDING này KHÔNG phải việc của quản trị nhóm
-            actAs(memberPet);
-            groupService.invite(groupId, inviteePet);
+            // member mời invitee — hàng PENDING này KHÔNG phải việc của quản trị nhóm
+            actAs(member);
+            groupService.invite(groupId, invitee);
 
-            actAs(ownerPet);
+            actAs(owner);
             assertThat(inTransaction(() -> groupService.listJoinRequests(groupId)))
-                    .extracting(GroupDtos.PendingMemberView::petId)
-                    .containsExactly(outsiderPet);
+                    .extracting(GroupDtos.PendingMemberView::accountId)
+                    .containsExactly(outsider);
         }
 
         @Test
@@ -406,17 +395,17 @@ class GroupMembershipIntegrationTest extends IntegrationTestBase {
         void khong_duyet_duoc_loi_moi() {
             Integer groupId = group(GroupType.PRIVATE);
             joinAsMember(groupId);
-            actAs(memberPet);
-            groupService.invite(groupId, inviteePet);
+            actAs(member);
+            groupService.invite(groupId, invitee);
 
-            actAs(ownerPet);
-            assertThatThrownBy(() -> groupService.reviewJoinRequest(groupId, inviteePet, true))
+            actAs(owner);
+            assertThatThrownBy(() -> groupService.reviewJoinRequest(groupId, invitee, true))
                     .isInstanceOf(NotFoundException.class);
         }
     }
 
     @Nested
-    @DisplayName("Lời mời: chính pet được mời trả lời")
+    @DisplayName("Lời mời: chính người được mời trả lời")
     class LoiMoi {
 
         @Test
@@ -424,16 +413,16 @@ class GroupMembershipIntegrationTest extends IntegrationTestBase {
         void thanh_vien_moi_duoc() {
             Integer groupId = group(GroupType.PRIVATE);
             joinAsMember(groupId);
-            Integer postId = groupPost(groupId, memberPet);
+            Integer postId = groupPost(groupId, member);
 
-            actAs(memberPet);
-            assertThat(groupService.invite(groupId, inviteePet).status())
+            actAs(member);
+            assertThat(groupService.invite(groupId, invitee).status())
                     .isEqualTo(GroupMemberStatus.PENDING);
 
-            actAs(inviteePet);
-            assertThatThrownBy(() -> postService.getOneById(postId, null, inviteePet))
+            actAs(invitee);
+            assertThatThrownBy(() -> postService.getOneById(postId, invitee))
                     .isInstanceOf(NotFoundException.class);
-            assertThat(groupService.getListJoinedByPet(inviteePet))
+            assertThat(groupService.getListJoined(invitee))
                     .extracting(GroupDtos.GroupSummary::id).doesNotContain(groupId);
         }
 
@@ -442,8 +431,8 @@ class GroupMembershipIntegrationTest extends IntegrationTestBase {
         void nguoi_ngoai_khong_moi_duoc() {
             Integer groupId = group(GroupType.PUBLIC);
 
-            actAs(outsiderPet);
-            assertThatThrownBy(() -> groupService.invite(groupId, inviteePet))
+            actAs(outsider);
+            assertThatThrownBy(() -> groupService.invite(groupId, invitee))
                     .isInstanceOf(ForbiddenException.class);
         }
 
@@ -452,15 +441,15 @@ class GroupMembershipIntegrationTest extends IntegrationTestBase {
         void chap_nhan_thi_thanh_thanh_vien() {
             Integer groupId = group(GroupType.PRIVATE);
             joinAsMember(groupId);
-            Integer postId = groupPost(groupId, memberPet);
+            Integer postId = groupPost(groupId, member);
 
-            actAs(memberPet);
-            groupService.invite(groupId, inviteePet);
+            actAs(member);
+            groupService.invite(groupId, invitee);
 
-            actAs(inviteePet);
+            actAs(invitee);
             assertThat(groupService.respondToInvite(groupId, true).status())
                     .isEqualTo(GroupMemberStatus.ACTIVE);
-            assertThat(inTransaction(() -> postService.getOneById(postId, null, inviteePet)))
+            assertThat(inTransaction(() -> postService.getOneById(postId, invitee)))
                     .isNotNull();
         }
 
@@ -470,43 +459,43 @@ class GroupMembershipIntegrationTest extends IntegrationTestBase {
             Integer groupId = group(GroupType.PUBLIC);
             joinAsMember(groupId);
 
-            actAs(memberPet);
-            groupService.invite(groupId, inviteePet);
-            actAs(inviteePet);
+            actAs(member);
+            groupService.invite(groupId, invitee);
+            actAs(invitee);
             groupService.respondToInvite(groupId, false);
-            assertThat(statusOf(groupId, inviteePet)).isNull();
+            assertThat(statusOf(groupId, invitee)).isNull();
 
-            actAs(memberPet);
-            assertThat(groupService.invite(groupId, inviteePet).status())
+            actAs(member);
+            assertThat(groupService.invite(groupId, invitee).status())
                     .isEqualTo(GroupMemberStatus.PENDING);
         }
 
         @Test
-        @DisplayName("hộp thư lời mời chỉ của pet đang thao tác")
+        @DisplayName("hộp thư lời mời chỉ của tài khoản đang thao tác")
         void hop_thu_loi_moi() {
             Integer groupId = group(GroupType.PRIVATE);
             joinAsMember(groupId);
-            actAs(memberPet);
-            groupService.invite(groupId, inviteePet);
+            actAs(member);
+            groupService.invite(groupId, invitee);
 
-            actAs(inviteePet);
+            actAs(invitee);
             assertThat(inTransaction(() -> groupService.listMyInvites()))
                     .extracting(GroupDtos.PendingInviteView::groupId).contains(groupId);
 
-            actAs(outsiderPet);
+            actAs(outsider);
             assertThat(inTransaction(() -> groupService.listMyInvites())).isEmpty();
         }
 
-        /** Bấm "tham gia" khi đang có lời mời = chấp nhận lời mời đó; kết quả pet muốn là như nhau */
+        /** Bấm "tham gia" khi đang có lời mời = chấp nhận lời mời đó; kết quả người dùng muốn là như nhau */
         @Test
         @DisplayName("tham gia khi đang được mời thì coi như chấp nhận")
         void tham_gia_khi_duoc_moi() {
             Integer groupId = group(GroupType.PRIVATE);
             joinAsMember(groupId);
-            actAs(memberPet);
-            groupService.invite(groupId, inviteePet);
+            actAs(member);
+            groupService.invite(groupId, invitee);
 
-            actAs(inviteePet);
+            actAs(invitee);
             assertThat(groupService.join(groupId).status()).isEqualTo(GroupMemberStatus.ACTIVE);
         }
 
@@ -516,8 +505,8 @@ class GroupMembershipIntegrationTest extends IntegrationTestBase {
             Integer groupId = group(GroupType.PUBLIC);
             joinAsMember(groupId);
 
-            actAs(memberPet);
-            assertThatThrownBy(() -> groupService.invite(groupId, ownerPet))
+            actAs(member);
+            assertThatThrownBy(() -> groupService.invite(groupId, owner))
                     .isInstanceOf(ConflictException.class);
         }
     }
@@ -531,17 +520,17 @@ class GroupMembershipIntegrationTest extends IntegrationTestBase {
         void thanh_vien_roi_duoc() {
             Integer groupId = group(GroupType.PRIVATE);
             joinAsMember(groupId);
-            Integer postId = groupPost(groupId, ownerPet);
+            Integer postId = groupPost(groupId, owner);
 
-            actAs(memberPet);
-            assertThat(inTransaction(() -> postService.getOneById(postId, null, memberPet))).isNotNull();
+            actAs(member);
+            assertThat(inTransaction(() -> postService.getOneById(postId, member))).isNotNull();
 
-            actAs(memberPet);
+            actAs(member);
             groupService.leave(groupId);
 
-            assertThat(statusOf(groupId, memberPet)).isNull();
-            actAs(memberPet);
-            assertThatThrownBy(() -> postService.getOneById(postId, null, memberPet))
+            assertThat(statusOf(groupId, member)).isNull();
+            actAs(member);
+            assertThatThrownBy(() -> postService.getOneById(postId, member))
                     .isInstanceOf(NotFoundException.class);
         }
 
@@ -550,7 +539,7 @@ class GroupMembershipIntegrationTest extends IntegrationTestBase {
         void chu_nhom_khong_roi_duoc() {
             Integer groupId = group(GroupType.PUBLIC);
 
-            actAs(ownerPet);
+            actAs(owner);
             assertThatThrownBy(() -> groupService.leave(groupId))
                     .isInstanceOf(BadRequestException.class);
         }
@@ -560,7 +549,7 @@ class GroupMembershipIntegrationTest extends IntegrationTestBase {
         void nguoi_ngoai_khong_roi_duoc() {
             Integer groupId = group(GroupType.PUBLIC);
 
-            actAs(outsiderPet);
+            actAs(outsider);
             assertThatThrownBy(() -> groupService.leave(groupId))
                     .isInstanceOf(BadRequestException.class);
         }

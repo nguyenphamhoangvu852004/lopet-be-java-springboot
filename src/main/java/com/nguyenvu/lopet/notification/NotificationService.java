@@ -14,9 +14,9 @@ import com.nguyenvu.lopet.notification.dto.NotificationDtos;
 import com.nguyenvu.lopet.notification.entity.Notification;
 import com.nguyenvu.lopet.notification.entity.NotificationObjectType;
 import com.nguyenvu.lopet.notification.entity.NotificationStatus;
+import com.nguyenvu.lopet.accountprofile.entity.AccountProfile;
+import com.nguyenvu.lopet.accountprofile.repository.AccountProfileRepository;
 import com.nguyenvu.lopet.notification.repository.NotificationRepository;
-import com.nguyenvu.lopet.petprofile.entity.PetProfile;
-import com.nguyenvu.lopet.petprofile.repository.PetProfileRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -26,7 +26,7 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final AccountRepository accountRepository;
-    private final PetProfileRepository petProfileRepository;
+    private final AccountProfileRepository accountProfileRepository;
 
     /**
      * Tạo thông báo THỦ CÔNG qua REST.
@@ -123,19 +123,16 @@ public class NotificationService {
     }
 
     /**
-     * Hồ sơ nhúng trong thông báo lấy từ {@code pet_profiles}: mọi nội dung dẫn tới từ thông báo đều
-     * do thú cưng tạo ra, nên hiện tên và ảnh của chủ sẽ không khớp với thứ người dùng bấm vào.
-     *
-     * <p>Tài khoản chưa có thú cưng nào vẫn nhận object rỗng thay vì null — cùng giao kèo cũ.
+     * Tài khoản chưa có hồ sơ vẫn nhận object rỗng thay vì null — cùng giao kèo cũ.
      */
     private NotificationDtos.NotificationAccount toAccount(Account account) {
-        PetProfile profile = petProfileRepository.findRepresentativeByAccountId(account.getId())
+        AccountProfile profile = accountProfileRepository.findByAccountId(account.getId())
                 .orElse(null);
         NotificationDtos.NotificationProfile profileDto = profile == null
                 // Object rỗng {} — không phải null: bản TS gán new GetProfileOutputDTO() chưa set gì
                 ? new NotificationDtos.NotificationProfile(null, null, null, null, null, null)
-                : new NotificationDtos.NotificationProfile(profile.getId(), profile.getHandle(),
-                        profile.getDisplayName(), profile.getBio(), profile.getAvatarUrl(),
+                : new NotificationDtos.NotificationProfile(profile.getId(), profile.getFullName(),
+                        profile.getPhoneNumber(), profile.getBio(), profile.getAvatarUrl(),
                         profile.getCoverUrl());
 
         return new NotificationDtos.NotificationAccount(account.getId(), account.getUsername(),

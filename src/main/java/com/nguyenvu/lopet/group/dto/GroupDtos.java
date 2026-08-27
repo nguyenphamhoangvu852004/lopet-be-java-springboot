@@ -7,22 +7,13 @@ import com.nguyenvu.lopet.group.entity.GroupMemberRole;
 import com.nguyenvu.lopet.group.entity.GroupMemberStatus;
 import com.nguyenvu.lopet.group.entity.GroupType;
 
-/**
- * <b>Thành viên nhóm là THÚ CƯNG.</b> Sau khi khoá chính của {@code group_members} đổi từ
- * {@code (group_id, account_id)} sang {@code (group_id, pet_id)}, mọi khoá {@code accountId} ở đây
- * thành {@code petId} và {@code account} thành {@code pet}. Giữ tên cũ sẽ khiến client gửi id tài
- * khoản vào chỗ đang chờ id thú cưng — hai bên đều là số nguyên nên không có tầng nào bắt được.
- */
 public final class GroupDtos {
-
-    public record CreateGroupRequest(String name, String type, String bio) {
-    }
 
     public record CreateGroupResponse(
             Integer id,
             String name,
             GroupType type,
-            Integer ownerPetId,
+            Integer ownerAccountId,
             String bio,
             String coverUrl,
             LocalDateTime createdAt) {
@@ -50,9 +41,6 @@ public final class GroupDtos {
     public record DeleteGroupResponse(Integer groupId) {
     }
 
-    public record ModifyGroupRequest(String name, String type, String bio) {
-    }
-
     public record ModifyGroupResponse(Integer id, boolean success) {
     }
 
@@ -60,7 +48,7 @@ public final class GroupDtos {
     public record GroupSummary(
             Integer id,
             String name,
-            Integer ownerPetId,
+            Integer ownerAccountId,
             String bio,
             String coverUrl,
             GroupType type,
@@ -77,7 +65,7 @@ public final class GroupDtos {
      *   <li>{@code restricted} — true nghĩa là {@code members} đã bị rút thành danh sách rỗng vì
      *       người xem không phải thành viên của một nhóm PRIVATE. Client phải đọc cờ này chứ không
      *       suy ra từ {@code members.isEmpty()}: một nhóm PUBLIC rỗng cũng cho danh sách rỗng.
-     *   <li>{@code viewerStatus} — quan hệ của PET đang xem với nhóm, là thứ quyết định nút hiển thị
+     *   <li>{@code viewerStatus} — quan hệ của người đang xem với nhóm, là thứ quyết định nút hiển thị
      *       là "Tham gia", "Đã gửi yêu cầu" hay "Rời nhóm".
      * </ul>
      */
@@ -97,9 +85,9 @@ public final class GroupDtos {
     }
 
     /**
-     * Quan hệ của pet đang xem với nhóm. {@code NONE} cũng là giá trị trả về cho khách chưa đăng
-     * nhập hoặc người đã đăng nhập mà chưa chọn pet — cả ba trường hợp đều "chưa dính gì tới nhóm
-     * này", nên gộp lại thay vì thêm một giá trị mà client phải xử lý y hệt.
+     * Quan hệ của người đang xem với nhóm. {@code NONE} cũng là giá trị trả về cho khách chưa đăng
+     * nhập — cả hai trường hợp đều "chưa dính gì tới nhóm này", nên gộp lại thay vì thêm một giá
+     * trị mà client phải xử lý y hệt.
      */
     public enum ViewerStatus {
         NONE,
@@ -114,22 +102,21 @@ public final class GroupDtos {
             LocalDateTime updatedAt,
             LocalDateTime deletedAt,
             Integer groupId,
-            Integer petId,
-            GroupMemberPet pet,
+            Integer accountId,
+            GroupMemberAccount account,
             GroupMemberRole role,
             LocalDateTime joinedAt) {
     }
 
     /**
-     * Thành viên hiển thị bằng hồ sơ CÔNG KHAI của thú cưng. Route {@code GET /v1/groups/:id} không
-     * xác thực, nên nó không được để lộ tài khoản đứng sau từng thành viên — trước đây nó trả nguyên
-     * {@code AccountBrief} kèm email.
+     * Thành viên hiển thị bằng hồ sơ tài khoản. Route {@code GET /v1/groups/:id} không xác thực, nên
+     * nó cố ý KHÔNG trả email như {@code AccountBrief} từng làm — danh sách thành viên của một nhóm
+     * công khai không phải chỗ để lộ địa chỉ liên lạc của từng người.
      */
-    public record GroupMemberPet(
-            Integer petId,
-            String name,
-            String handle,
-            String displayName,
+    public record GroupMemberAccount(
+            Integer accountId,
+            String username,
+            String fullName,
             String avatarUrl) {
     }
 
@@ -137,8 +124,8 @@ public final class GroupDtos {
     public record GroupIdRequest(Integer groupId) {
     }
 
-    /** {@code petId} là THÚ CƯNG có yêu cầu đang chờ được duyệt hoặc bị từ chối */
-    public record ReviewMemberRequest(Integer groupId, Integer petId) {
+    /** {@code accountId} là người có yêu cầu đang chờ được duyệt hoặc bị từ chối */
+    public record ReviewMemberRequest(Integer groupId, Integer accountId) {
     }
 
     /**
@@ -146,37 +133,37 @@ public final class GroupDtos {
      * (nhóm PRIVATE). Client đọc khoá này để biết nên hiện "Đã tham gia" hay "Đã gửi yêu cầu" mà
      * không cần gọi lại chi tiết nhóm.
      */
-    public record JoinGroupResponse(Integer groupId, Integer petId, GroupMemberStatus status) {
+    public record JoinGroupResponse(Integer groupId, Integer accountId, GroupMemberStatus status) {
     }
 
-    public record LeaveGroupResponse(Integer groupId, Integer petId) {
+    public record LeaveGroupResponse(Integer groupId, Integer accountId) {
     }
 
-    /** {@code status} luôn là PENDING: lời mời chỉ thành thành viên sau khi chính pet đó chấp nhận */
-    public record InviteResponse(Integer groupId, Integer inviteePetId, GroupMemberStatus status) {
+    /** {@code status} luôn là PENDING: lời mời chỉ thành thành viên sau khi người được mời chấp nhận */
+    public record InviteResponse(Integer groupId, Integer inviteeAccountId, GroupMemberStatus status) {
     }
 
-    /** Một pet đang chờ được duyệt vào nhóm. {@code requestedAt} là lúc gửi yêu cầu. */
+    /** Một người đang chờ được duyệt vào nhóm. {@code requestedAt} là lúc gửi yêu cầu. */
     public record PendingMemberView(
             Integer groupId,
-            Integer petId,
-            GroupMemberPet pet,
+            Integer accountId,
+            GroupMemberAccount account,
             LocalDateTime requestedAt) {
     }
 
     /**
-     * Một lời mời đang chờ pet trả lời. Kèm tên nhóm để hộp thư mời không phải gọi thêm một vòng
-     * chi tiết nhóm cho từng dòng.
+     * Một lời mời đang chờ trả lời. Kèm tên nhóm để hộp thư mời không phải gọi thêm một vòng chi
+     * tiết nhóm cho từng dòng.
      *
-     * <p>{@code invitedBy} có thể là object rỗng nếu pet đã mời sau đó ngừng hoạt động — cột
+     * <p>{@code invitedBy} có thể là object rỗng nếu người đã mời sau đó bị xoá — cột
      * {@code invited_by} cố ý không có khoá ngoại, xem {@code GroupMember}.
      */
     public record PendingInviteView(
             Integer groupId,
             String groupName,
             GroupType groupType,
-            Integer petId,
-            GroupMemberPet invitedBy,
+            Integer accountId,
+            GroupMemberAccount invitedBy,
             LocalDateTime invitedAt) {
     }
 

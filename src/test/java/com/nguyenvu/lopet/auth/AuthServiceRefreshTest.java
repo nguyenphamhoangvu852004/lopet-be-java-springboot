@@ -18,8 +18,6 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import com.nguyenvu.lopet.account.entity.Account;
 import com.nguyenvu.lopet.account.entity.AccountRole;
 import com.nguyenvu.lopet.account.repository.AccountRepository;
-import com.nguyenvu.lopet.auth.dto.RefreshTokenRequest;
-import com.nguyenvu.lopet.auth.dto.RefreshTokenResponse;
 import com.nguyenvu.lopet.common.exception.UnauthorizedException;
 import com.nguyenvu.lopet.email.OtpStore;
 import com.nguyenvu.lopet.role.entity.Role;
@@ -69,8 +67,7 @@ class AuthServiceRefreshTest {
     void cap_lai_cap_token_moi_tu_refresh_token_hop_le() {
         when(accountRepository.findDetailById(7)).thenReturn(Optional.of(account));
 
-        RefreshTokenResponse result =
-                authService.refresh(new RefreshTokenRequest(refreshTokenOf(account)));
+        IssuedTokens result = authService.refresh(refreshTokenOf(account));
 
         assertThat(result.id()).isEqualTo(7);
         // Access token mới phải dùng được ngay trên các route thường
@@ -96,7 +93,7 @@ class AuthServiceRefreshTest {
         account.setAccountRoles(roles);
         when(accountRepository.findDetailById(7)).thenReturn(Optional.of(account));
 
-        RefreshTokenResponse result = authService.refresh(new RefreshTokenRequest(tokenKhongCoRole));
+        IssuedTokens result = authService.refresh(tokenKhongCoRole);
 
         assertThat(jwtService.parseAccessToken(result.accessToken()).roles()).containsExactly("ADMIN");
     }
@@ -106,7 +103,7 @@ class AuthServiceRefreshTest {
         String accessToken = jwtService.generateAccessToken(
                 new UserPrincipal(7, "user@lopet.local", java.util.List.of()));
 
-        assertThatThrownBy(() -> authService.refresh(new RefreshTokenRequest(accessToken)))
+        assertThatThrownBy(() -> authService.refresh(accessToken))
                 .isInstanceOf(UnauthorizedException.class)
                 .hasMessage("Refresh token không hợp lệ");
     }
@@ -117,7 +114,7 @@ class AuthServiceRefreshTest {
                 ACCESS_SECRET, REFRESH_SECRET, 3600, -1);
         String expired = hetHan.generateRefreshToken(new UserPrincipal(7, "user@lopet.local", java.util.List.of()));
 
-        assertThatThrownBy(() -> authService.refresh(new RefreshTokenRequest(expired)))
+        assertThatThrownBy(() -> authService.refresh(expired))
                 .isInstanceOf(UnauthorizedException.class)
                 .hasMessage("Refresh token đã hết hạn");
     }
@@ -128,7 +125,7 @@ class AuthServiceRefreshTest {
                 ACCESS_SECRET, "khoa-gia-mao-cua-ke-tan-cong", 3600, 36000);
         String forged = keGiaMao.generateRefreshToken(new UserPrincipal(7, "user@lopet.local", java.util.List.of()));
 
-        assertThatThrownBy(() -> authService.refresh(new RefreshTokenRequest(forged)))
+        assertThatThrownBy(() -> authService.refresh(forged))
                 .isInstanceOf(UnauthorizedException.class);
     }
 
@@ -142,9 +139,23 @@ class AuthServiceRefreshTest {
         account.setIsBanned(1);
         when(accountRepository.findDetailById(7)).thenReturn(Optional.of(account));
 
-        assertThatThrownBy(() -> authService.refresh(new RefreshTokenRequest(token)))
+        assertThatThrownBy(() -> authService.refresh(token))
                 .isInstanceOf(UnauthorizedException.class)
                 .hasMessage("Người dùng user đã bị khoá");
+    }
+
+    /**
+     * Không có cookie thì cũng là 401 chứ không phải 400: từ góc nhìn client, "chưa từng đăng nhập"
+     * và "phiên đã chết" dẫn tới cùng một hành động — quay về màn hình đăng nhập.
+     */
+    @Test
+    void thieu_refresh_token_tra_401() {
+        assertThatThrownBy(() -> authService.refresh(null))
+                .isInstanceOf(UnauthorizedException.class)
+                .hasMessage("Refresh token không hợp lệ");
+        assertThatThrownBy(() -> authService.refresh("   "))
+                .isInstanceOf(UnauthorizedException.class)
+                .hasMessage("Refresh token không hợp lệ");
     }
 
     @Test
@@ -152,7 +163,7 @@ class AuthServiceRefreshTest {
         String token = refreshTokenOf(account);
         when(accountRepository.findDetailById(7)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> authService.refresh(new RefreshTokenRequest(token)))
+        assertThatThrownBy(() -> authService.refresh(token))
                 .isInstanceOf(UnauthorizedException.class);
     }
 }

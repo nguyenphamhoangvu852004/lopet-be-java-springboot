@@ -72,7 +72,7 @@ public class NotificationPublisher {
     }
 
     /**
-     * Một pet xin vào nhóm PRIVATE. Gọi một lần cho MỖI quản trị nhóm: thông báo là bản ghi
+     * Ai đó xin vào nhóm PRIVATE. Gọi một lần cho MỖI quản trị nhóm: thông báo là bản ghi
      * một-người-nhận, không có khái niệm gửi cho một nhóm người.
      */
     @Transactional
@@ -80,19 +80,19 @@ public class NotificationPublisher {
         publish(actorId, managerAccountId, NotificationObjectType.GROUP_JOIN_REQUESTED, groupId);
     }
 
-    /** Yêu cầu vào nhóm được duyệt — người nhận là chủ của pet đã xin vào */
+    /** Yêu cầu vào nhóm được duyệt — người nhận là người đã xin vào */
     @Transactional
     public void groupJoinApproved(Integer actorId, Integer requesterAccountId, Integer groupId) {
         publish(actorId, requesterAccountId, NotificationObjectType.GROUP_JOIN_APPROVED, groupId);
     }
 
-    /** Lời mời vào nhóm — người nhận là chủ của pet được mời */
+    /** Lời mời vào nhóm — người nhận là người được mời */
     @Transactional
     public void groupInvited(Integer actorId, Integer inviteeAccountId, Integer groupId) {
         publish(actorId, inviteeAccountId, NotificationObjectType.GROUP_INVITED, groupId);
     }
 
-    /** Lời mời vào nhóm được chấp nhận — người nhận là chủ của pet đã mời */
+    /** Lời mời vào nhóm được chấp nhận — người nhận là người đã mời */
     @Transactional
     public void groupInviteAccepted(Integer actorId, Integer inviterAccountId, Integer groupId) {
         publish(actorId, inviterAccountId, NotificationObjectType.GROUP_INVITE_ACCEPTED, groupId);

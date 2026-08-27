@@ -9,16 +9,6 @@ import com.nguyenvu.lopet.security.authz.OwnershipGuard;
 
 import lombok.RequiredArgsConstructor;
 
-/**
- * Tin nhắn không có "một chủ sở hữu": cả người gửi lẫn người nhận đều là bên hợp lệ.
- *
- * <p>ADMIN cũng KHÔNG được bỏ qua — nội dung tin nhắn riêng tư không phải thứ kiểm duyệt viên tự ý
- * đọc được. Muốn xử lý vi phạm thì đi qua luồng báo cáo.
- *
- * <p>Trước bản vá, hai endpoint tin nhắn chỉ có verifyToken và service cũng không đối chiếu người
- * gọi: bất kỳ ai đăng nhập cũng đọc được nội dung tin nhắn riêng tư của người khác chỉ bằng cách
- * đoán id, và đổi được cả trạng thái của nó.
- */
 @Component
 @RequiredArgsConstructor
 public class MessageAccessGuard {

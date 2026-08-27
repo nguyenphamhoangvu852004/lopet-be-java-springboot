@@ -4,8 +4,8 @@ import java.time.LocalDate;
 
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
@@ -22,13 +22,13 @@ import com.nguyenvu.lopet.security.RequirePermission;
 import lombok.RequiredArgsConstructor;
 
 /**
- * Hồ sơ CHỦ SỞ HỮU — thông tin của con người đứng sau tài khoản, KHÔNG phải thực thể hoạt động trên
- * mạng xã hội. Thực thể đó là {@code PetProfile}, và nó mới là thứ có endpoint đọc công khai.
+ * Hồ sơ tài khoản — thực thể hiển thị của một người dùng trên mạng xã hội.
  *
- * <p>Vì vậy module này không còn đường đọc nào cho người ngoài: ba endpoint cũ
- * ({@code GET /v1/profiles}, {@code GET /v1/profiles/{id}}, {@code GET /v1/profiles/accounts/{id}})
- * đã bị xoá. Số điện thoại, ngày sinh, quê quán của chủ tài khoản trước đây ai cũng đọc được — kể cả
- * khách chưa đăng nhập — chỉ cần biết một id.
+ * <p>Ba endpoint đọc cũ ({@code GET /v1/profiles}, {@code GET /v1/profiles/{id}},
+ * {@code GET /v1/profiles/accounts/{id}}) đã bị xoá vì chúng không lọc quyền: số điện thoại, ngày
+ * sinh, quê quán của bất kỳ ai cũng đọc được — kể cả bởi khách chưa đăng nhập — chỉ cần biết một id.
+ * Đường đọc hồ sơ người khác nay đi qua {@code GET /v1/account-profiles/accounts/{id}} và bị chặn
+ * bởi {@link com.nguyenvu.lopet.accountprofile.repository.AccountProfileVisibilityFilter}.
  *
  * <p>Người dùng KHÔNG tự tạo hồ sơ: mỗi tài khoản được cấp sẵn một hồ sơ ngay lúc đăng ký
  * ({@link AccountProfileFactory}). Không endpoint nào nhận {@code profileId} — hồ sơ luôn tra bằng
@@ -51,6 +51,19 @@ public class AccountProfileController {
                 profileService.findByAccountId(CurrentUser.require().id()));
     }
 
+    /**
+     * Hồ sơ của người khác, lọc theo {@code visibility} của chính hồ sơ đó.
+     *
+     * <p>{@code @Auth(required = false)}: hồ sơ PUBLIC đọc được bởi khách vãng lai, nên bắt đăng nhập
+     * sẽ chặn nhầm. Người đã đăng nhập thì mở thêm nhánh chính chủ và nhánh bạn bè.
+     */
+    @GetMapping("/accounts/{id}")
+    @Auth(required = false)
+    public ApiResponse<AccountProfileDtos.PublicProfile> getByAccountId(@PathVariable Integer id) {
+        return ApiResponse.ok("Get profile successfully",
+                profileService.findVisibleByAccountId(id, CurrentUser.viewerId()));
+    }
+
     /* ---------- Ghi: chỉ hồ sơ của chính người gọi ---------- */
 
     /**
@@ -68,23 +81,13 @@ public class AccountProfileController {
             @RequestParam(required = false) String dateOfBirth,
             @RequestParam(required = false) String hometown,
             @RequestParam(required = false) Integer sex,
+            @RequestParam(required = false) String visibility,
             @RequestPart(name = "avatar", required = false) MultipartFile avatar,
             @RequestPart(name = "cover", required = false) MultipartFile cover) {
         return ApiResponse.ok("Update profile successfully",
                 profileService.updateMine(CurrentUser.require().id(), fullName, phoneNumber, bio,
-                        uploadOrNull(avatar), uploadOrNull(cover), parseDate(dateOfBirth), hometown, sex));
-    }
-
-    /** Biến thể JSON: không nhận file nên hai trường ảnh luôn là null, tức là giữ nguyên ảnh cũ */
-    @PutMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
-    @Auth
-    @RequirePermission("accountProfile:update:own")
-    public ApiResponse<AccountProfileDtos.ProfileEntity> updateJson(
-            @RequestBody AccountProfileDtos.UpdateProfileRequest request) {
-        return ApiResponse.ok("Update profile successfully",
-                profileService.updateMine(CurrentUser.require().id(), request.fullName(),
-                        request.phoneNumber(), request.bio(), null, null,
-                        parseDate(request.dateOfBirth()), request.hometown(), request.sex()));
+                        uploadOrNull(avatar), uploadOrNull(cover), parseDate(dateOfBirth), hometown, sex,
+                        visibility));
     }
 
     /** null (không phải chuỗi rỗng) khi không có file — đó là tín hiệu "giữ nguyên ảnh cũ" */
