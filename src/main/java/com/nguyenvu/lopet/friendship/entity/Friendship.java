@@ -22,13 +22,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/**
- * KHÔNG có UNIQUE(sender_id, receiver_id): hai bản ghi ngược chiều giữa cùng một cặp tài khoản có
- * thể cùng tồn tại, đúng như dữ liệu hiện tại cho phép.
- *
- * <p>Hai quan hệ khai EAGER vì bên TS đặt {@code eager: true} — nhiều luồng đọc thẳng
- * {@code friendship.sender.id} ngay sau khi query mà không join tay.
- */
 @Getter
 @Setter
 @Builder

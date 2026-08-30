@@ -1,15 +1,3 @@
--- Dọn 42 cột thừa trong database `socialmedia`.
---
--- Nguồn gốc: một lần chạy thử backend Java TRƯỚC khi cấu hình naming strategy. Spring Boot mặc
--- định đổi tên cột đã khai tường minh sang snake_case (`createdAt` -> `created_at`), nên
--- ddl-auto=update đã THÊM một bộ cột song song bên cạnh bộ cột camelCase mà TypeORM tạo ra.
--- Lỗi cấu hình đã được sửa (application.yml: physical-strategy=PhysicalNamingStrategyStandardImpl),
--- các cột này chỉ còn là rác.
---
--- ĐÃ KIỂM: cả 42 cột đều rỗng hoàn toàn (0 giá trị non-null) — không mất dữ liệu nào.
--- Dữ liệu thật nằm ở các cột camelCase và không bị đụng tới.
---
--- Chạy: docker exec -i mysql-docker mysql -uroot -pnguyenvu socialmedia < cleanup-socialmedia-junk-columns.sql
 
 ALTER TABLE `account_role` DROP COLUMN `deleted_at`;
 ALTER TABLE `account_role` DROP COLUMN `granted_at`;

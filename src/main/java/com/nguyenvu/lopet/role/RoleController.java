@@ -22,7 +22,6 @@ public class RoleController {
 
     private final RoleRepository roleRepository;
 
-    /** Chỉ cần đăng nhập, không cần permission — đúng như route TS */
     @GetMapping
     @Auth
     @Transactional(readOnly = true)

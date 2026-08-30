@@ -14,12 +14,6 @@ import com.nguyenvu.lopet.security.jwt.JwtException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-/**
- * Áp đúng ngữ nghĩa hai middleware xác thực của lopet-be, dựa trên {@link Auth} gắn ở handler.
- *
- * <p>Chạy TRƯỚC khi vào controller nên cũng chạy trước aspect của {@link RequirePermission} —
- * giống thứ tự {@code verifyToken()} rồi mới tới {@code requirePermission()} trong file route.
- */
 @Component
 public class AuthInterceptor implements HandlerInterceptor {
 

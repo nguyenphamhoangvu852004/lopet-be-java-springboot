@@ -28,15 +28,6 @@ public class FriendshipController {
 
     private final FriendshipService friendshipService;
 
-    /**
-     * Danh sách bạn bè của một tài khoản: chỉ chính chủ hoặc bạn bè (ACCEPTED) của họ mới xem được.
-     *
-     * <p>Đây là dạng quyền mà cả RBAC lẫn ownership đều không diễn tả được: không phải "bạn là ai",
-     * cũng không phải "bạn có sở hữu cái này không", mà là "bạn có quan hệ gì với chủ tài nguyên".
-     *
-     * <p>ADMIN KHÔNG được bỏ qua: danh sách bạn bè là dữ liệu riêng tư, không phải thứ kiểm duyệt
-     * viên tự ý xem. Vi phạm thì đi qua luồng báo cáo.
-     */
     @GetMapping("/{id}")
     @Auth
     public ApiResponse<FriendshipDtos.FriendshipListResponse> getFriends(@PathVariable Integer id) {
@@ -47,10 +38,6 @@ public class FriendshipController {
         return ApiResponse.ok(HttpStatusMessage.OK, friendshipService.getFriends(id));
     }
 
-    /**
-     * {@code :id} trên đường dẫn CỐ Ý bị bỏ qua ở hai endpoint dưới đây — controller TS dùng
-     * {@code req.user.id}, nên chúng luôn trả dữ liệu của chính người gọi.
-     */
     @GetMapping("/send/{id}")
     @Auth
     public ApiResponse<FriendshipDtos.FriendshipListResponse> getSent(@PathVariable Integer id) {

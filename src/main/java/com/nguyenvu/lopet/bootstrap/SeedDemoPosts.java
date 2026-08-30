@@ -16,10 +16,6 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Bài đăng demo cho môi trường dev. {@link StartupRunner} chỉ gọi seeder này khi
- * {@code lopet.bootstrap.seed-demo=true}, và cờ đó chỉ bật ở profile {@code dev}.
- */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -51,9 +47,6 @@ public class SeedDemoPosts {
 
     @Transactional
     public void execute() {
-        // Tra cứu theo email thay vì `Account.builder().id(2)` như trước. Id 2 chỉ đúng khi database
-        // trống và AdminInitializer chạy ngay trước — đủ sai ở bất kỳ database dev nào đã có dữ liệu,
-        // và khi đó khoá ngoại account_id trỏ vào một tài khoản không tồn tại (hoặc của người khác).
         Account demoAccount = accountRepository.findDetailByEmail(SeedDemoAccount.DEMO_EMAIL)
                 .orElse(null);
         if (demoAccount == null) {
@@ -61,8 +54,6 @@ public class SeedDemoPosts {
             return;
         }
 
-        // Idempotent: seeder chạy mỗi lần khởi động, còn database dev sống qua nhiều lần restart nhờ
-        // volume. Thiếu nhánh này thì mỗi lần `docker compose up` lại thêm 16 bài trùng nội dung.
         if (postRepository.existsByAccountId(demoAccount.getId())) {
             log.debug("Bỏ qua seed bài đăng demo: tài khoản {} đã có bài", SeedDemoAccount.DEMO_EMAIL);
             return;
@@ -74,12 +65,8 @@ public class SeedDemoPosts {
                     .account(demoAccount)
                     .content(faker.lorem().paragraph())
                     .postScope(PostScope.PUBLIC)
-                    .group(null)
                     .build();
 
-            // Chủ sở hữu quan hệ là PostMedia.post (`@OneToMany(mappedBy = "post")` ở Post), nên chỉ
-            // bỏ media vào set của Post là KHÔNG đủ — Hibernate lấy khoá ngoại từ `media.post`, và
-            // để trống thì insert chết với "Column 'post_id' cannot be null". Phải gắn cả hai chiều.
             PostMedia media = PostMedia.builder()
                     .mediaType(MediaType.IMAGE)
                     .mediaUrl("https://res.cloudinary.com/dmsnw2qpd/image/upload/v1787728262/" +listImageURLs.get(i))
@@ -87,7 +74,6 @@ public class SeedDemoPosts {
                     .build();
             p.getPostMedias().add(media);
 
-            // cascade = CascadeType.ALL trên Post.postMedias lo phần lưu media kèm theo.
             this.postRepository.save(p);
         }
         log.info("Đã seed {} bài đăng demo cho {}", listImageURLs.size() - 1, SeedDemoAccount.DEMO_EMAIL);

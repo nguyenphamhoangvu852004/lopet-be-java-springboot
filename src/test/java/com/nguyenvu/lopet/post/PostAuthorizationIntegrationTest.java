@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -29,12 +28,6 @@ import com.nguyenvu.lopet.common.exception.NotFoundException;
 import com.nguyenvu.lopet.friendship.entity.Friendship;
 import com.nguyenvu.lopet.friendship.entity.FriendshipStatus;
 import com.nguyenvu.lopet.friendship.repository.FriendshipRepository;
-import com.nguyenvu.lopet.group.entity.Group;
-import com.nguyenvu.lopet.group.entity.GroupMember;
-import com.nguyenvu.lopet.group.entity.GroupMemberRole;
-import com.nguyenvu.lopet.group.entity.GroupType;
-import com.nguyenvu.lopet.group.repository.GroupMemberRepository;
-import com.nguyenvu.lopet.group.repository.GroupRepository;
 import com.nguyenvu.lopet.post.dto.PostDtos;
 import com.nguyenvu.lopet.post.entity.MediaType;
 import com.nguyenvu.lopet.post.entity.PostScope;
@@ -42,30 +35,15 @@ import com.nguyenvu.lopet.post.repository.PostMediaRepository;
 import com.nguyenvu.lopet.post.repository.PostRepository;
 import com.nguyenvu.lopet.support.IntegrationTestBase;
 
-/**
- * Bản port của {@code postAuthorization.integration.test.ts} — phía GHI của ma trận phân quyền:
- * tạo bài, bình luận, trả lời, thả tim, sửa scope.
- *
- * <p>{@link PostVisibilityIntegrationTest} đã phủ phía ĐỌC ở tầng query. File này chạy ở tầng
- * SERVICE vì các quy tắc còn lại — "ai được đăng vào group nào", "comment cha có thuộc đúng bài
- * không" — không nằm trong câu truy vấn mà nằm ở PostService/CommentService.
- *
- */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @DisplayName("Phân quyền phía ghi — tầng service")
 class PostAuthorizationIntegrationTest extends IntegrationTestBase {
 
-    /**
-     * Database RIÊNG cho lớp test này. Hai bộ test tích hợp cùng ghi vào một database sẽ nhìn thấy
-     * bài viết của nhau, làm mọi khẳng định "người xem thấy ĐÚNG những bài này" mất nghĩa — bản TS
-     * cũng tách database theo từng file vì lý do đó.
-     */
     @DynamicPropertySource
     static void database(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", () -> IntegrationTestBase.jdbcUrl("lopet_java_authz_test"));
     }
 
-    /** Xem ghi chú cùng tên ở {@code PostVisibilityIntegrationTest} */
     private static final String RUN = Long.toString(System.nanoTime(), 36);
 
     @Autowired
@@ -77,10 +55,6 @@ class PostAuthorizationIntegrationTest extends IntegrationTestBase {
     @Autowired
     private AccountRepository accountRepository;
     @Autowired
-    private GroupRepository groupRepository;
-    @Autowired
-    private GroupMemberRepository groupMemberRepository;
-    @Autowired
     private FriendshipRepository friendshipRepository;
     @Autowired
     private PostMediaRepository postMediaRepository;
@@ -88,9 +62,6 @@ class PostAuthorizationIntegrationTest extends IntegrationTestBase {
     private Integer author;
     private Integer friend;
     private Integer stranger;
-    private Integer groupMember;
-    private Integer publicGroup;
-    private Integer privateGroup;
 
     @BeforeAll
     void seed() {
@@ -98,31 +69,15 @@ class PostAuthorizationIntegrationTest extends IntegrationTestBase {
             Account authorAccount = account("authz-author");
             Account friendAccount = account("authz-friend");
             Account strangerAccount = account("authz-stranger");
-            Account memberAccount = account("authz-groupmember");
 
             author = authorAccount.getId();
             friend = friendAccount.getId();
             stranger = strangerAccount.getId();
-            groupMember = memberAccount.getId();
 
             friendshipRepository.save(Friendship.builder().sender(authorAccount).receiver(friendAccount)
                     .status(FriendshipStatus.ACCEPTED).build());
-            // Lời mời PENDING — cố ý để chứng minh nó KHÔNG được tính là bạn bè
             friendshipRepository.save(Friendship.builder().sender(strangerAccount).receiver(authorAccount)
                     .status(FriendshipStatus.PENDING).build());
-
-            Group open = groupRepository.save(Group.builder()
-                    .name("authz-nhom-cong-khai-" + RUN).type(GroupType.PUBLIC).coverUrl("").build());
-            Group closed = groupRepository.save(Group.builder()
-                    .name("authz-nhom-rieng-tu-" + RUN).type(GroupType.PRIVATE).coverUrl("").build());
-            publicGroup = open.getId();
-            privateGroup = closed.getId();
-
-            for (Group group : List.of(open, closed)) {
-                groupMemberRepository.save(GroupMember.builder()
-                        .groupId(group.getId()).accountId(groupMember)
-                        .role(GroupMemberRole.MEMBER).joinedAt(LocalDateTime.now()).build());
-            }
         });
     }
 
@@ -133,11 +88,10 @@ class PostAuthorizationIntegrationTest extends IntegrationTestBase {
     }
 
     private Integer personalPost(PostScope scope) {
-        return postService.create(author, "personal-" + scope + "-" + System.nanoTime(), null,
+        return postService.create(author, "personal-" + scope + "-" + System.nanoTime(),
                 scope.name(), List.of()).postId();
     }
 
-    /** Bài của {@code author} kèm {@code count} ảnh, trả về danh sách id media theo đúng thứ tự */
     private List<Integer> postWithMedia(int count) {
         List<PostService.UploadedMedia> medias = new ArrayList<>();
         for (int i = 0; i < count; i++) {
@@ -145,17 +99,12 @@ class PostAuthorizationIntegrationTest extends IntegrationTestBase {
                     MediaType.IMAGE));
         }
         PostDtos.CreatePostResponse created = postService.create(author,
-                "bai-co-media-" + System.nanoTime(), null, PostScope.PUBLIC.name(), medias);
+                "bai-co-media-" + System.nanoTime(), PostScope.PUBLIC.name(), medias);
 
         List<Integer> ids = new ArrayList<>();
         ids.add(created.postId());
         created.postMedias().forEach(media -> ids.add(media.id()));
         return ids;
-    }
-
-    private Integer groupPost(Integer groupId, Integer accountId) {
-        return postService.create(accountId, "group-" + groupId + "-" + System.nanoTime(), groupId,
-                PostScope.PUBLIC.name(), List.of()).postId();
     }
 
     private Integer comment(Integer accountId, Integer postId, Integer replyTo) {
@@ -167,72 +116,8 @@ class PostAuthorizationIntegrationTest extends IntegrationTestBase {
     }
 
     @Nested
-    @DisplayName("Tạo bài trong group")
-    class TaoBaiTrongGroup {
-
-        @Test
-        @DisplayName("nhóm PUBLIC: thành viên đăng được, và bài đọc được cả khi chưa đăng nhập")
-        void nhom_public_thanh_vien_dang_duoc() {
-            Integer postId = groupPost(publicGroup, groupMember);
-            assertThat(postId).isPositive();
-            assertThat(readAs(postId, null)).isNotNull();
-        }
-
-        /**
-         * ĐỌC bài của nhóm PUBLIC thì mở cho cả khách, nhưng ĐĂNG thì phải tham gia nhóm trước —
-         * nếu không thì nút "tham gia nhóm" chẳng thay đổi điều gì.
-         */
-        @Test
-        @DisplayName("nhóm PUBLIC: người ngoài nhóm KHÔNG đăng được")
-        void nhom_public_nguoi_ngoai_khong_dang_duoc() {
-            assertThatThrownBy(() -> groupPost(publicGroup, stranger))
-                    .isInstanceOf(ForbiddenException.class);
-        }
-
-        @Test
-        @DisplayName("nhóm PRIVATE: thành viên đăng được")
-        void thanh_vien_dang_duoc() {
-            assertThat(groupPost(privateGroup, groupMember)).isPositive();
-        }
-
-        @Test
-        @DisplayName("nhóm PRIVATE: người ngoài KHÔNG đăng được — đây là lỗ hổng cũ")
-        void nguoi_ngoai_khong_dang_duoc() {
-            // Trước bản vá, create() chỉ nạp group rồi gắn vào bài mà không hỏi tư cách thành viên,
-            // nên lệnh này thành công và bài hiện ra với cả nhóm.
-            assertThatThrownBy(() -> groupPost(privateGroup, stranger))
-                    .isInstanceOf(ForbiddenException.class);
-        }
-
-        @Test
-        @DisplayName("bài của thành viên không lọt ra ngoài nhóm")
-        void bai_khong_lot_ra_ngoai() {
-            Integer postId = groupPost(privateGroup, groupMember);
-
-            assertThatThrownBy(() -> readAs(postId, null)).isInstanceOf(NotFoundException.class);
-            assertThatThrownBy(() -> readAs(postId, stranger)).isInstanceOf(NotFoundException.class);
-            assertThat(readAs(postId, groupMember)).isNotNull();
-        }
-
-        @Test
-        @DisplayName("groupId không tồn tại thì báo lỗi, không âm thầm thành bài cá nhân")
-        void group_khong_ton_tai_bao_loi() {
-            // Hành vi cũ gán group = null, biến bài người dùng tưởng đang đăng trong nhóm thành bài
-            // cá nhân PUBLIC — tức là đẩy nội dung ra ngoài.
-            assertThatThrownBy(() -> groupPost(999_999, author)).isInstanceOf(NotFoundException.class);
-        }
-    }
-
-    @Nested
     @DisplayName("Ràng buộc scope")
     class RangBuocScope {
-
-        @Test
-        @DisplayName("bài nhóm không nhận scope FRIEND")
-        void bai_nhom_khong_nhan_FRIEND() {
-            assertThatThrownBy(() -> postService.create(groupMember, "scope sai", publicGroup,
-                    PostScope.FRIEND.name(), List.of())).isInstanceOf(BadRequestException.class);
-        }
 
         @Test
         @DisplayName("bài cá nhân nhận đủ PUBLIC / FRIEND / PRIVATE")
@@ -245,7 +130,7 @@ class PostAuthorizationIntegrationTest extends IntegrationTestBase {
         @Test
         @DisplayName("scope rác bị từ chối")
         void scope_rac_bi_tu_choi() {
-            assertThatThrownBy(() -> postService.create(author, "x", null, "EVERYONE", List.of()))
+            assertThatThrownBy(() -> postService.create(author, "x", "EVERYONE", List.of()))
                     .isInstanceOf(BadRequestException.class);
         }
     }
@@ -266,7 +151,7 @@ class PostAuthorizationIntegrationTest extends IntegrationTestBase {
         @Test
         @DisplayName("tài khoản không tồn tại thì không đăng bài được")
         void tai_khoan_khong_ton_tai_khong_dang_duoc() {
-            assertThatThrownBy(() -> postService.create(-1, "khong co tai khoan", null,
+            assertThatThrownBy(() -> postService.create(-1, "khong co tai khoan",
                     PostScope.PUBLIC.name(), List.of())).isInstanceOf(BadRequestException.class);
         }
     }
@@ -274,17 +159,6 @@ class PostAuthorizationIntegrationTest extends IntegrationTestBase {
     @Nested
     @DisplayName("Sửa bài")
     class SuaBai {
-
-        @Test
-        @DisplayName("scope xét theo group thật, không theo body")
-        void scope_xet_theo_group_that() {
-            Integer postId = groupPost(publicGroup, groupMember);
-            // Request không hề nhắc tới groupId — trước bản vá controller coi đây là bài cá nhân và
-            // cho phép FRIEND.
-            assertThatThrownBy(() -> postService.update(postId, groupMember, "sua noi dung",
-                    PostScope.FRIEND.name(), List.of(), List.of()))
-                    .isInstanceOf(BadRequestException.class);
-        }
 
         @Test
         @DisplayName("người không sở hữu bài không sửa được")
@@ -303,10 +177,6 @@ class PostAuthorizationIntegrationTest extends IntegrationTestBase {
                     List.of(), List.of()).postId()).isEqualTo(postId);
         }
 
-        /**
-         * Ca hồi quy quan trọng nhất của nhóm này: trước bản vá, {@code null} bị gộp với danh sách
-         * rỗng nên sửa mỗi nội dung là xoá sạch ảnh của bài — mất dữ liệu, im lặng, không hoàn tác.
-         */
         @Test
         @DisplayName("không gửi oldIdsMedia thì media được giữ nguyên")
         void khong_nhac_toi_media_thi_giu_nguyen() {
@@ -348,10 +218,6 @@ class PostAuthorizationIntegrationTest extends IntegrationTestBase {
                     .containsExactly(giuLai);
         }
 
-        /**
-         * Nhận id của bài khác thì response trả về media không thuộc bài đang sửa, mà media đó cũng
-         * không thật sự được giữ lại — hai bên nói khác nhau.
-         */
         @Test
         @DisplayName("id media của bài khác bị từ chối, media của bài này còn nguyên")
         void id_cua_bai_khac_bi_tu_choi() {
@@ -403,14 +269,6 @@ class PostAuthorizationIntegrationTest extends IntegrationTestBase {
         }
 
         @Test
-        @DisplayName("bài trong nhóm PRIVATE — chỉ thành viên bình luận được")
-        void bai_nhom_private_chi_thanh_vien() {
-            Integer postId = groupPost(privateGroup, groupMember);
-            assertThat(comment(groupMember, postId, null)).isPositive();
-            assertThatThrownBy(() -> comment(stranger, postId, null)).isInstanceOf(BadRequestException.class);
-        }
-
-        @Test
         @DisplayName("bình luận mang danh tính tài khoản, kèm hồ sơ của nó")
         void binh_luan_mang_danh_tinh_tai_khoan() {
             Integer postId = personalPost(PostScope.PUBLIC);
@@ -419,7 +277,6 @@ class PostAuthorizationIntegrationTest extends IntegrationTestBase {
             var items = commentService.getAllFromPost(postId, stranger).comments();
             assertThat(items).hasSize(1);
             assertThat(items.getFirst().account().id()).isEqualTo(stranger);
-            // Hồ sơ nằm trong đồ thị nạp nên object profile luôn khác null
             assertThat(items.getFirst().account().profile()).isNotNull();
         }
 
@@ -452,9 +309,6 @@ class PostAuthorizationIntegrationTest extends IntegrationTestBase {
         @Test
         @DisplayName("không ghép được comment cha của bài khác vào bài mình xem được")
         void khong_ghep_duoc_comment_bai_khac() {
-            // Kịch bản tấn công: lấy replyCommentId từ một bài PRIVATE của người khác, ghép với
-            // postId của một bài công khai. Kiểm tra quyền chạy trên bài công khai, nhưng comment
-            // cha lại nằm ở bài riêng tư — tức là kiểm nhầm tài nguyên.
             Integer privatePost = personalPost(PostScope.PRIVATE);
             Integer hiddenComment = comment(author, privatePost, null);
             Integer publicPost = personalPost(PostScope.PUBLIC);
@@ -509,14 +363,6 @@ class PostAuthorizationIntegrationTest extends IntegrationTestBase {
         }
 
         @Test
-        @DisplayName("bài trong nhóm PRIVATE — chỉ thành viên")
-        void bai_nhom_private_chi_thanh_vien() {
-            Integer postId = groupPost(privateGroup, groupMember);
-            assertThat(like(postId, groupMember).message()).isEqualTo("Like post successfully");
-            assertThatThrownBy(() -> like(postId, stranger)).isInstanceOf(BadRequestException.class);
-        }
-
-        @Test
         @DisplayName("thả tim hai lần là idempotent, không phải lỗi")
         void tha_tim_hai_lan_idempotent() {
             Integer postId = personalPost(PostScope.PUBLIC);
@@ -539,7 +385,6 @@ class PostAuthorizationIntegrationTest extends IntegrationTestBase {
 
             assertThat(inTransaction(() ->
                     postRepository.findVisibleById(postId, stranger))).isEmpty();
-            // Chủ bài vẫn nạp được bình thường — bộ lọc không chặn nhầm người có quyền
             assertThat(inTransaction(() ->
                     postRepository.findVisibleById(postId, author))).isPresent();
         }
@@ -553,17 +398,6 @@ class PostAuthorizationIntegrationTest extends IntegrationTestBase {
                     postRepository.findVisibleById(postId, stranger)
                             .orElseThrow().getAccount().getId());
             assertThat(ownerId).isEqualTo(author);
-        }
-
-        @Test
-        @DisplayName("bài trong nhóm PRIVATE nạp ra rỗng với người ngoài nhóm")
-        void bai_nhom_private_nap_ra_rong() {
-            Integer postId = groupPost(privateGroup, groupMember);
-
-            assertThat(inTransaction(() ->
-                    postRepository.findVisibleById(postId, stranger))).isEmpty();
-            assertThat(inTransaction(() ->
-                    postRepository.findVisibleById(postId, groupMember))).isPresent();
         }
     }
 
@@ -581,7 +415,7 @@ class PostAuthorizationIntegrationTest extends IntegrationTestBase {
             assertThat(postService.getByAccountId(author, stranger))
                     .noneMatch(post -> post.postId().equals(postId));
 
-            assertThat(postService.getAll(null, null, stranger))
+            assertThat(postService.getAll(null, stranger, 1, 100).content())
                     .noneMatch(post -> post.postId().equals(postId));
 
             assertThat(postService.getSuggestList(stranger))

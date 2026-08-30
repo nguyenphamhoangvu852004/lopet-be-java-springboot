@@ -28,18 +28,6 @@ public class NotificationService {
     private final AccountRepository accountRepository;
     private final AccountProfileRepository accountProfileRepository;
 
-    /**
-     * Tạo thông báo THỦ CÔNG qua REST.
-     *
-     * <p>Không còn là đường chính: mọi thông báo của ứng dụng nay do {@link NotificationPublisher}
-     * sinh ra ngay trong service của hành động tương ứng, kèm {@code objectId} để bấm vào được.
-     * Endpoint này giữ lại cho client cũ, và vì thế thông báo nó tạo ra không có {@code objectId} —
-     * hiện được nhưng không dẫn đi đâu.
-     *
-     * <p>Actor/receptor không tồn tại được ném dưới dạng lỗi 500 kèm nguyên văn message — bản TS
-     * dùng {@code new Error(...)} chứ không phải lớp HttpError, nên {@code error.code} là undefined
-     * và handler trung tâm rơi về 500.
-     */
     @Transactional
     public NotificationDtos.CreateNotificationResponse create(Integer actorId, Integer receptorId, String content,
                                                                String objectType) {
@@ -55,12 +43,9 @@ public class NotificationService {
                 .status(NotificationStatus.SENT)
                 .build();
 
-        // Nhận đúng tên các hằng số của enum. Chuỗi lạ để cột objectType là null và vi phạm ràng
-        // buộc NOT NULL — đúng như bản TS, nơi hai câu if đơn giản không có nhánh else.
         try {
             notification.setObjectType(NotificationObjectType.valueOf(objectType));
         } catch (IllegalArgumentException | NullPointerException ignored) {
-            // Giữ nguyên hành vi cũ: không ném ở đây, để ràng buộc cột từ chối bản ghi
         }
 
         Notification saved = notificationRepository.save(notification);
@@ -122,14 +107,10 @@ public class NotificationService {
                 saved.getObjectType(), saved.getObjectId());
     }
 
-    /**
-     * Tài khoản chưa có hồ sơ vẫn nhận object rỗng thay vì null — cùng giao kèo cũ.
-     */
     private NotificationDtos.NotificationAccount toAccount(Account account) {
         AccountProfile profile = accountProfileRepository.findByAccountId(account.getId())
                 .orElse(null);
         NotificationDtos.NotificationProfile profileDto = profile == null
-                // Object rỗng {} — không phải null: bản TS gán new GetProfileOutputDTO() chưa set gì
                 ? new NotificationDtos.NotificationProfile(null, null, null, null, null, null)
                 : new NotificationDtos.NotificationProfile(profile.getId(), profile.getFullName(),
                         profile.getPhoneNumber(), profile.getBio(), profile.getAvatarUrl(),

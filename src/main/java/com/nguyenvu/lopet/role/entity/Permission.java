@@ -18,10 +18,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/**
- * Bảng này được seed từ {@code PermissionCatalog} để có thể truy vấn/hiển thị, nhưng bản trong code
- * mới là bản dùng để quyết định ở runtime — versioned theo git, test được, không cần invalidate cache.
- */
 @Getter
 @Setter
 @Builder
@@ -36,7 +32,6 @@ public class Permission extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    /** Mã quyền dạng {@code resource:action} hoặc {@code resource:action:own} */
     @Column(name = "code", nullable = false, unique = true)
     private String code;
 

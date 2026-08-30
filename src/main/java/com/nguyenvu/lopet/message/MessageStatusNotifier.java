@@ -11,17 +11,6 @@ import com.nguyenvu.lopet.realtime.RealtimeGateway;
 
 import lombok.RequiredArgsConstructor;
 
-/**
- * Đẩy sự kiện trạng thái về NGƯỜI GỬI của từng tin vừa đổi trạng thái, qua
- * {@code /topic/user.<senderId>/message-status}.
- *
- * <p>Gọi từ bên NGOÀI transaction của service, không phải bên trong: xem
- * {@link MessageDtos.StatusUpdateResult}.
- *
- * <p>Một lần đánh dấu đã xem có thể chạm tới tin của nhiều người khác nhau (hội thoại hai chiều),
- * nên phải gộp theo người gửi rồi mới gửi — mỗi người nhận đúng danh sách id của mình và không thấy
- * id tin nhắn của người kia.
- */
 @Component
 @RequiredArgsConstructor
 public class MessageStatusNotifier {

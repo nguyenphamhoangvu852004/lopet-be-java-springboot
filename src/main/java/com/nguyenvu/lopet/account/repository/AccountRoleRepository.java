@@ -14,10 +14,6 @@ public interface AccountRoleRepository extends JpaRepository<AccountRole, Accoun
 
     List<AccountRole> findByAccountId(Integer accountId);
 
-    /**
-     * Giữ đúng ngữ nghĩa "set" của {@code setRolesToAccount}: thu hồi hết role cũ rồi cấp lại danh
-     * sách mới, chứ không cộng dồn.
-     */
     @Modifying
     @Query("delete from AccountRole ar where ar.accountId = :accountId")
     void deleteByAccountId(@Param("accountId") Integer accountId);

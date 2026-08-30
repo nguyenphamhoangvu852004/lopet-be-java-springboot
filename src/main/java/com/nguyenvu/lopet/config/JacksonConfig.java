@@ -13,28 +13,12 @@ import tools.jackson.databind.SerializationContext;
 import tools.jackson.databind.ValueSerializer;
 import tools.jackson.databind.module.SimpleModule;
 
-/**
- * Giữ nguyên cách {@code JSON.stringify} của Node serialize một {@code Date}:
- * {@code "2026-08-10T05:12:33.000Z"} — luôn UTC, luôn đúng 3 chữ số mili giây, luôn hậu tố Z.
- *
- * <p>Cột trong DB là {@code datetime(6)} không mang timezone; driver mysql của Node đọc nó theo
- * timezone của tiến trình rồi mới đổi sang UTC lúc serialize. Chuyển đổi ở đây tái hiện đúng dãy
- * đó: LocalDateTime → zone hệ thống → UTC. Mặc định của Jackson là ISO không có offset, tức là
- * client sẽ hiểu sai múi giờ nếu không ghi đè.
- *
- * <p>Customizer này chạm tới ObjectMapper của Spring (Jackson 3, {@code tools.jackson}), và đó là
- * ObjectMapper duy nhất trong ứng dụng: REST lẫn STOMP over WebSocket đều serialize qua nó, nên
- * payload realtime không thể lệch định dạng với payload REST. Bản netty-socketio trước đây thì có
- * thể: nó mang theo Jackson 2 riêng, không thấy cấu hình này, và phải cắm lại cùng định dạng ở một
- * chỗ thứ hai.
- */
 @Configuration
 public class JacksonConfig {
 
     private static final DateTimeFormatter NODE_ISO =
             DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
 
-    /** Nguồn duy nhất của định dạng ngày trả cho client, dùng chung cho REST lẫn Socket.IO */
     public static String nodeIso(LocalDateTime value) {
         return value.atZone(ZoneId.systemDefault())
                 .withZoneSameInstant(ZoneId.of("UTC"))

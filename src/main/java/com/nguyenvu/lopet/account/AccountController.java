@@ -81,13 +81,11 @@ public class AccountController {
                 accountService.getSuggest(CurrentUser.require().id(), limit));
     }
 
-
     @Operation(summary = "Set role to specific account")
     @PutMapping
     @Auth
     @RequirePermission("account:setRole")
     public ApiResponse<AccountViews.AccountDetail> setRoles(@RequestBody SetRolesRequest request) {
-        // grantedBy lấy từ token, không nhận từ body
         return ApiResponse.ok("Set roles to account successfully",
                 accountService.setRoles(request.userId(), request.roles(), CurrentUser.require().id()));
     }

@@ -8,13 +8,6 @@ import com.nguyenvu.lopet.friendship.entity.FriendshipStatus;
 
 public final class FriendshipDtos {
 
-    /**
-     * {@code me} là tài khoản ĐANG ĐƯỢC XEM (theo {@code :id}), không phải người gọi — và cũng
-     * không có {@code status} vì bản TS không gán trường đó cho phần tử này.
-     *
-     * <p>Không DTO nào ở đây chứa email: chúng liệt kê nhiều tài khoản một lúc, để email vào là rò
-     * email hàng loạt cho bất kỳ ai gọi được endpoint.
-     */
     public record FriendshipListResponse(Person me, List<Person> others) {
     }
 

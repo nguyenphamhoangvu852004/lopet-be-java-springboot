@@ -37,15 +37,11 @@ public class AdminInitializer {
 
     @Transactional
     public void execute() {
-        // Cấu hình trống (môi trường test) thì bỏ qua thay vì tạo tài khoản rỗng rồi vỡ ràng buộc
-        // unique — bản TS không gặp nhánh này vì .env luôn có sẵn ba biến.
         if (email.isBlank() || username.isBlank() || password.isBlank()) {
             log.info("Bỏ qua khởi tạo admin: INIT_ADMIN_* chưa được cấu hình");
             return;
         }
 
-        // Đường tạo tài khoản THỨ HAI, không đi qua AuthService.register. Thiếu profile ở đây thì
-        // tài khoản admin rơi đúng vào trạng thái "account không có hồ sơ" mà refactor vừa xoá bỏ.
         if (!accountRepository.existsByEmail(email)) {
             accountRepository.save(Account.builder()
                     .email(email)

@@ -14,13 +14,9 @@ spring:
     default: dev
 
   lifecycle:
-    # Ngừng nhận request mới rồi mới tắt: docker stop gửi SIGTERM, khoảng này để request đang dở
-    # chạy nốt thay vì đứt giữa chừng.
     timeout-per-shutdown-phase: 20s
 
   datasource:
-    # Tham số kết nối gom vào đây thay vì rải trong .env: chúng là thuộc tính của driver, không
-    # phải của môi trường. allowPublicKeyRetrieval cần cho MySQL 8 với caching_sha2_password.
     url: jdbc:mysql://${DATABASE_HOSTNAME:localhost}:${DATABASE_PORT:3306}/${DATABASE_NAME:socialmedia}?useUnicode=true&characterEncoding=utf8&allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
     username: ${DATABASE_USERNAME:root}
     password: ${DATABASE_PASSWORD:}
@@ -32,11 +28,6 @@ spring:
         dialect: org.hibernate.dialect.MySQLDialect
     hibernate:
       naming:
-        # BẮT BUỘC. Mặc định của Spring Boot (CamelCaseToUnderscoresNamingStrategy) đổi cả tên cột
-        # đã khai TƯỜNG MINH: `@Column(name="createdAt")` -> `created_at`, `receptorId` ->
-        # `receptor_id`. Schema do TypeORM sinh ra giữ nguyên camelCase, nên bỏ dòng này là mọi
-        # entity đi tìm một bộ cột song song không tồn tại — app chết ngay ở seeder lúc khởi động
-        # ("Unknown column 'p1_0.created_at'"), và ddl-auto=update còn kịp thêm một loạt cột rác.
         physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
 
   data:
@@ -59,9 +50,6 @@ lopet:
     refresh-token-expires-in: ${REFRESH_TOKEN_EXPIRES_IN:36000}
 
   auth:
-    # Cookie chứa refresh token. secure/same-site tách ra biến môi trường vì hai môi trường cần hai
-    # cấu hình khác nhau: dev chạy http nên Secure=true là cookie bị bỏ luôn, còn prod có FE khác
-    # domain thì bắt buộc SameSite=None + Secure mới gửi kèm được.
     refresh-cookie:
       name: ${REFRESH_COOKIE_NAME:refreshToken}
       path: ${REFRESH_COOKIE_PATH:/}
@@ -87,7 +75,6 @@ lopet:
     username: ${INIT_ADMIN_USERNAME:}
     password: ${INIT_ADMIN_PASSWORD:}
 
-# seed data
   bootstrap:
     seed-demo: false
 

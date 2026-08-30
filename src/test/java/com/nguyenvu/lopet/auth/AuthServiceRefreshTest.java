@@ -27,10 +27,6 @@ import com.nguyenvu.lopet.security.jwt.UserPrincipal;
 
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * Dùng {@link JwtService} thật (chỉ mock repository) vì phần dễ sai nhất của luồng này nằm ở chỗ
- * refresh token được ký bằng khoá KHÁC access token — mock jwtService sẽ giả định đúng cái cần kiểm.
- */
 @ExtendWith(MockitoExtension.class)
 class AuthServiceRefreshTest {
 
@@ -70,18 +66,12 @@ class AuthServiceRefreshTest {
         IssuedTokens result = authService.refresh(refreshTokenOf(account));
 
         assertThat(result.id()).isEqualTo(7);
-        // Access token mới phải dùng được ngay trên các route thường
         UserPrincipal decoded = jwtService.parseAccessToken(result.accessToken());
         assertThat(decoded.id()).isEqualTo(7);
         assertThat(decoded.email()).isEqualTo("user@lopet.local");
-        // Refresh token trả về là token MỚI, không phải token client vừa gửi lên
         assertThat(jwtService.parseRefreshToken(result.refreshToken()).id()).isEqualTo(7);
     }
 
-    /**
-     * Chốt chặn quan trọng nhất: roles lấy từ DB tại thời điểm gia hạn. Ký lại nguyên payload cũ thì
-     * một lần cấp/thu quyền phải chờ hết hạn refresh token (10 giờ) mới có hiệu lực.
-     */
     @Test
     void roles_duoc_doc_lai_tu_DB_chu_khong_lay_tu_token_cu() {
         String tokenKhongCoRole = refreshTokenOf(account);
@@ -129,10 +119,6 @@ class AuthServiceRefreshTest {
                 .isInstanceOf(UnauthorizedException.class);
     }
 
-    /**
-     * Ban tài khoản là cơ chế thu hồi phiên duy nhất ở bản không lưu trạng thái này — nó phải chặn
-     * được việc gia hạn, nếu không thì tài khoản bị khoá vẫn sống mãi bằng cách refresh liên tục.
-     */
     @Test
     void tai_khoan_bi_khoa_khong_gia_han_duoc() {
         String token = refreshTokenOf(account);
@@ -144,10 +130,6 @@ class AuthServiceRefreshTest {
                 .hasMessage("Người dùng user đã bị khoá");
     }
 
-    /**
-     * Không có cookie thì cũng là 401 chứ không phải 400: từ góc nhìn client, "chưa từng đăng nhập"
-     * và "phiên đã chết" dẫn tới cùng một hành động — quay về màn hình đăng nhập.
-     */
     @Test
     void thieu_refresh_token_tra_401() {
         assertThatThrownBy(() -> authService.refresh(null))

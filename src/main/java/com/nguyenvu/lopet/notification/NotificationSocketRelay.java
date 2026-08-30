@@ -9,13 +9,6 @@ import com.nguyenvu.lopet.realtime.RealtimeGateway;
 
 import lombok.RequiredArgsConstructor;
 
-/**
- * Đẩy thông báo vừa ghi tới phòng riêng của người nhận.
- *
- * <p>{@code AFTER_COMMIT} chứ không phải listener thường: bắn trong transaction thì người nhận có
- * thể thấy thông báo trước lúc dữ liệu kịp vào database — bấm vào là mở ra một bài viết chưa tồn
- * tại — và thấy nhầm hẳn nếu transaction rollback.
- */
 @Component
 @RequiredArgsConstructor
 public class NotificationSocketRelay {

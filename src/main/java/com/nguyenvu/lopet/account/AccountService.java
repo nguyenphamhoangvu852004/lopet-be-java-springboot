@@ -46,16 +46,6 @@ public class AccountService {
         return AccountMapper.toGetAccountResponse(account);
     }
 
-    /**
-     * Danh sách tài khoản cho staff. Hai đặc điểm phải giữ:
-     * <ul>
-     *   <li>lọc bỏ mọi tài khoản có role ADMIN (admin không tự hiện trong bảng quản trị);</li>
-     *   <li>trả về hình dạng entity kèm profile, accountRoles.role và CẢ HAI chiều friendship —
-     *       {@code findAll()} bên TS nạp đúng bốn quan hệ đó.</li>
-     * </ul>
-     * Friendship được nạp một lượt rồi gom theo tài khoản, thay cho N+1 và thay cho fetch join hai
-     * collection cùng lúc (sẽ nhân bản hàng).
-     */
     @Transactional(readOnly = true)
     public List<AccountViews.AccountListItem> getList() {
         List<Account> accounts = accountRepository.findAllDetail().stream()
@@ -82,7 +72,6 @@ public class AccountService {
                 .toList();
     }
 
-    /** Không tìm thấy tài khoản trả 400 chứ không phải 404 — bản TS ném {@code new BadRequest()} */
     @Transactional
     public IdResponse ban(Integer id) {
         return setBanned(id, 1);
@@ -99,7 +88,6 @@ public class AccountService {
         return new IdResponse(accountRepository.save(account).getId());
     }
 
-    /** Xoá CỨNG, kéo theo cascade ở posts/comments/reports/group_members — đúng như {@code remove()} */
     @Transactional
     public IdResponse delete(Integer id) {
         Account account = accountRepository.findDetailById(id).orElseThrow(BadRequestException::new);
@@ -107,11 +95,6 @@ public class AccountService {
         return new IdResponse(id);
     }
 
-    /**
-     * Gợi ý kết bạn. {@code limit} không được truyền (hoặc không phải số dương) thì KHÔNG giới hạn:
-     * bên TS {@code Number(undefined)} ra NaN, và {@code if (NaN)} trong TypeORM là falsy nên câu
-     * lệnh không hề có mệnh đề LIMIT.
-     */
     @Transactional(readOnly = true)
     public List<AccountViews.AccountBrief> getSuggest(Integer callerId, Integer limit) {
         if (accountRepository.findDetailById(callerId).isEmpty()) {
@@ -124,10 +107,6 @@ public class AccountService {
         return accounts.stream().map(AccountMapper::toBrief).toList();
     }
 
-    /**
-     * Giữ nguyên ngữ nghĩa "set": thu hồi hết role cũ rồi cấp lại danh sách mới. Cả hai bước nằm
-     * trong một transaction để không có khoảnh khắc tài khoản mất sạch quyền nếu bước sau lỗi.
-     */
     @Transactional
     public AccountViews.AccountDetail setRoles(Integer userId, List<String> roleNames, Integer grantedBy) {
         Account account = accountRepository.findById(userId)
@@ -145,19 +124,12 @@ public class AccountService {
                     .orElseThrow(() -> new NotFoundException("Role " + name + " not found")));
         }
 
-        // deleteByAccountId là bulk JPQL: nó xoá dưới DB nhưng KHÔNG gỡ bản ghi khỏi persistence
-        // context. Caller nào đã nạp account kèm roles (findDetail*, vốn có @EntityGraph trên
-        // accountRoles) thì các AccountRole cũ vẫn đang managed, và persist bản ghi mới cùng khoá
-        // (accountId, roleId) ngay bên dưới sẽ vỡ với NonUniqueObjectException. Detach trước khi xoá.
         accountRoleRepository.findByAccountId(userId).forEach(entityManager::detach);
         accountRoleRepository.deleteByAccountId(userId);
         accountRoleRepository.flush();
 
         Account granter = grantedBy == null ? null : accountRepository.getReferenceById(grantedBy);
         for (Role role : roles) {
-            // persist() chứ không phải save(): account_role dùng khoá chính gán sẵn (@IdClass) nên
-            // Spring Data coi mọi bản ghi là "đã tồn tại" và gọi merge(), mà merge lại phải nạp
-            // trước bản ghi cũ — bản ghi vừa bị xoá ngay phía trên.
             entityManager.persist(AccountRole.builder()
                     .accountId(userId)
                     .roleId(role.getId())
@@ -168,8 +140,6 @@ public class AccountService {
                     .build());
         }
         entityManager.flush();
-        // Dọn persistence context để lần đọc lại lấy đúng trạng thái vừa ghi xuống DB thay vì
-        // collection accountRoles đã nạp từ trước khi xoá.
         entityManager.clear();
 
         Account reloaded = accountRepository.findDetailById(userId).orElse(account);

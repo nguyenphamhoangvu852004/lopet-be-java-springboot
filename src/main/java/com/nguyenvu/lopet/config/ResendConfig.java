@@ -8,11 +8,6 @@ import com.resend.Resend;
 
 import lombok.extern.slf4j.Slf4j;
 
-/**
- * Client Resend dùng chung cho toàn app. {@code new Resend(apiKey)} không gọi mạng và không kiểm tra
- * khoá, nên context vẫn lên được khi khoá sai — lỗi chỉ lộ ra ở lần gửi đầu tiên. Cảnh báo dưới đây
- * tồn tại để trường hợp thiếu khoá không im lặng cho tới lúc user bấm "gửi OTP".
- */
 @Slf4j
 @Configuration
 public class ResendConfig {

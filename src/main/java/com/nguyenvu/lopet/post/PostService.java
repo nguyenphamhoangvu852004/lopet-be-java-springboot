@@ -6,7 +6,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import com.nguyenvu.lopet.post.dto.CursorPage;
+import com.nguyenvu.lopet.post.dto.OffsetPage;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,7 +18,6 @@ import com.nguyenvu.lopet.account.repository.AccountRepository;
 import com.nguyenvu.lopet.common.exception.BadRequestException;
 import com.nguyenvu.lopet.common.exception.ForbiddenException;
 import com.nguyenvu.lopet.common.exception.NotFoundException;
-import com.nguyenvu.lopet.group.entity.Group;
 import com.nguyenvu.lopet.notification.NotificationPublisher;
 import com.nguyenvu.lopet.post.dto.PostDtos;
 import com.nguyenvu.lopet.post.entity.MediaType;
@@ -28,17 +30,11 @@ import com.nguyenvu.lopet.post.repository.PostRepository;
 
 import lombok.RequiredArgsConstructor;
 
-/**
- * {@code viewerId} lấy từ token qua {@code @Auth(required = false)}; {@code null} = khách chưa đăng
- * nhập. Mọi luồng đọc bài đều phải truyền tham số này xuống repository để lọc quyền riêng tư —
- * lọc sau khi đã nạp hết bài về là sai, vì dữ liệu đã rời khỏi tầng có thẩm quyền.
- */
 @Service
 @RequiredArgsConstructor
 public class PostService {
-
-    /** Bản TS lấy đúng 10 bài mới nhất cho feed gợi ý */
     private static final int SUGGEST_SIZE = 10;
+    private static final int MAX_PAGE_SIZE = 100;
 
     private final PostRepository postRepository;
     private final PostMediaRepository postMediaRepository;
@@ -49,7 +45,7 @@ public class PostService {
 
     @Transactional(readOnly = true)
     public List<PostDtos.PostSuggestItem> getSuggestList(Integer viewerId) {
-        List<Integer> ids = postRepository.findVisibleIds(viewerId, PageRequest.of(0, SUGGEST_SIZE));
+        List<Integer> ids = postRepository.findVisibleIds(viewerId, null, PageRequest.of(0, SUGGEST_SIZE));
         if (ids.isEmpty()) {
             return List.of();
         }
@@ -59,16 +55,41 @@ public class PostService {
     }
 
     @Transactional(readOnly = true)
-    public List<PostDtos.PostListItem> getAll(String content, Integer groupId, Integer viewerId) {
-        return postRepository.findAllVisible(viewerId, content, groupId).stream()
-                .map(PostMapper::toListItem)
-                .toList();
+    public CursorPage<PostDtos.PostListItem> getAllByCursorStrategy(Integer lastCursor,int size) {
+        Pageable pageable  = PageRequest.of(0,size+1);
+        List<Post> listPost = this.postRepository.fetchNextPage(lastCursor,pageable);
+
+        boolean hasNext = listPost.size() > size;
+        if (hasNext) {
+            listPost = listPost.subList(0,size);
+        }
+        List<PostDtos.PostListItem> resDto = listPost.stream().map(PostMapper::toListItem).collect(Collectors.toList());
+
+        Integer nextCursor = hasNext && !listPost.isEmpty() ? listPost.get(listPost.size() -1).getId() : null;
+        return new CursorPage<>(resDto,nextCursor, hasNext);
     }
 
-    /**
-     * Trả 404 (không phải 403) khi người xem không đủ quyền: phản hồi phải giống hệt trường hợp bài
-     * không tồn tại, nếu không endpoint này trở thành công cụ dò xem một bài PRIVATE có tồn tại hay không.
-     */
+    @Transactional(readOnly = true)
+    public OffsetPage<PostDtos.PostListItem> getAll(String content, Integer viewerId, int page, int limit) {
+        if (page < 1) {
+            throw new BadRequestException("page phải lớn hơn hoặc bằng 1");
+        }
+        if (limit < 1 || limit > MAX_PAGE_SIZE) {
+            throw new BadRequestException("limit phải nằm trong khoảng 1.." + MAX_PAGE_SIZE);
+        }
+
+        long totalItems = postRepository.countVisible(viewerId, content);
+        List<Integer> ids = postRepository.findVisibleIds(viewerId, content, PageRequest.of(page - 1, limit));
+        if (ids.isEmpty()) {
+            return OffsetPage.of(List.of(), page, limit, totalItems);
+        }
+
+        List<PostDtos.PostListItem> items = postRepository.findAllByIdsWithDetails(ids).stream()
+                .map(PostMapper::toListItem)
+                .toList();
+        return OffsetPage.of(items, page, limit, totalItems);
+    }
+
     @Transactional(readOnly = true)
     public PostDtos.PostDetail getOneById(Integer id, Integer viewerId) {
         Post post = postRepository.findVisibleById(id, viewerId).orElseThrow(NotFoundException::new);
@@ -83,22 +104,15 @@ public class PostService {
     }
 
     @Transactional
-    public PostDtos.CreatePostResponse create(Integer accountId, String content, Integer groupId, String scope,
+    public PostDtos.CreatePostResponse create(Integer accountId, String content, String scope,
                                                List<UploadedMedia> medias) {
         Account account = accountRepository.findById(accountId).orElseThrow(BadRequestException::new);
-
-        // Quyền đăng vào group do policy quyết, không phải controller: controller chỉ thấy body,
-        // còn quyết định phụ thuộc group.type và tư cách thành viên.
-        Group group = groupId == null ? null : postPolicy.resolveGroupForPost(groupId, account.getId());
 
         Post post = Post.builder()
                 .account(account)
                 .content(content)
-                .group(group)
                 .build();
-        post.applyType();
-        // Suy ra từ group đã nạp thật, không từ groupId trong body
-        post.setPostScope(postPolicy.parseScope(scope, group != null));
+        post.setPostScope(postPolicy.parseScope(scope));
 
         Post saved = postRepository.save(post);
 
@@ -112,45 +126,23 @@ public class PostService {
             savedMedias.add(PostMapper.toMediaWithId(entity));
         }
 
-        // createdAt/updatedAt của response là thời điểm hiện tại, đúng như bản TS (new Date())
         LocalDateTime now = LocalDateTime.now();
         return new PostDtos.CreatePostResponse(saved.getAccount().getId(), saved.getId(),
-                saved.getContent(), saved.getGroup() == null ? null : saved.getGroup().getId(),
-                saved.getPostType(), saved.getPostScope(), savedMedias, now, now);
+                saved.getContent(), saved.getPostScope(), savedMedias, now, now);
     }
 
-    /**
-     * {@code keepMediaIds} là danh sách media được GIỮ LẠI; phần còn lại của bài bị xoá.
-     *
-     * <p><b>{@code null} và danh sách rỗng KHÔNG giống nhau.</b> {@code null} = "request không nhắc
-     * gì tới media" → giữ nguyên; rỗng = "giữ lại không cái nào" → xoá hết. Trước đây hai ca này bị
-     * gộp làm một và cùng rơi vào nhánh xoá sạch, nên chỉ cần sửa mỗi nội dung mà quên gửi
-     * {@code oldIdsMedia} là toàn bộ ảnh/video của bài biến mất — mất dữ liệu thật, im lặng, không
-     * hoàn tác được.
-     *
-     * <p>Id không thuộc chính bài này bị từ chối thay vì bỏ qua: nhận nó thì response trả về media
-     * của bài khác, mà media đó cũng chẳng được giữ lại thật.
-     *
-     * <p>Kiểm tra sở hữu ở đây là lớp thứ hai (lớp thứ nhất là ownership guard trên controller): bản
-     * TS cũng kiểm hai lần, và lớp trong này chặn cả trường hợp service được gọi từ nơi khác.
-     */
     @Transactional
     public PostDtos.UpdatePostResponse update(Integer postId, Integer callerId, String content, String scope,
                                                List<Integer> keepMediaIds, List<UploadedMedia> newMedias) {
         Post post = postRepository.findByIdInternal(postId)
                 .orElseThrow(() -> new BadRequestException("Post not found"));
 
-        // So bằng callerId ở vế trái: bài không có tác giả (account_id NULL) thì
-        // ownerAccountIdOf trả null và không ai sửa được nó — đúng hơn là để NPE.
         if (!callerId.equals(ownerAccountIdOf(post))) {
             throw new ForbiddenException("You are not the owner of this post");
         }
 
         post.setContent(content);
-        // Scope hợp lệ quyết theo group THẬT của bài (đã nạp từ DB), không theo groupId client gửi
-        // lên — tin body thì chỉ cần bỏ trống groupId là đặt được scope FRIEND cho một bài trong nhóm.
-        // Bài viết không đổi được group, nên đây cũng là group sau khi sửa.
-        post.setPostScope(postPolicy.parseScope(scope, post.getGroup() != null));
+        post.setPostScope(postPolicy.parseScope(scope));
 
         Post updated = postRepository.save(post);
 
@@ -161,8 +153,6 @@ public class PostService {
             Map<Integer, PostMedia> current = postMediaRepository.findByPostId(postId).stream()
                     .collect(Collectors.toMap(PostMedia::getId, media -> media));
 
-            // Kiểm TRƯỚC khi xoá: một id sai thì dừng lại từ đầu thay vì xoá xong mới phát hiện và
-            // dựa vào rollback để cứu.
             for (Integer id : keepMediaIds) {
                 PostMedia media = current.get(id);
                 if (media == null) {
@@ -188,12 +178,10 @@ public class PostService {
         }
 
         return new PostDtos.UpdatePostResponse(ownerAccountIdOf(updated), updated.getId(),
-                updated.getContent(), updated.getPostType(), updated.getPostScope(),
-                updated.getGroup() == null ? null : updated.getGroup().getId(), result,
+                updated.getContent(), updated.getPostScope(), result,
                 updated.getCreatedAt(), LocalDateTime.now());
     }
 
-    /** Xoá cứng — ownership đã được kiểm ở tầng guard trước khi vào đây */
     @Transactional
     public PostDtos.DeletePostResponse delete(Integer postId) {
         Post post = postRepository.findById(postId).orElseThrow(BadRequestException::new);
@@ -201,25 +189,17 @@ public class PostService {
         return new PostDtos.DeletePostResponse(postId);
     }
 
-    /**
-     * Bài mình không có quyền xem thì cũng không thả tim được. Nạp bằng bản CÓ lọc quyền: nếu dùng
-     * bản không lọc thì endpoint này thành công cụ dò — phản hồi khác nhau giữa "bài không tồn tại"
-     * và "bài PRIVATE của người khác".
-     */
     @Transactional
     public PostDtos.ReactResponse like(Integer postId, Integer accountId) {
         Post post = postRepository.findVisibleById(postId, accountId).orElseThrow(BadRequestException::new);
         Account account = accountRepository.findById(accountId).orElseThrow(BadRequestException::new);
 
         if (postLikeRepository.findByAccountAndPost(account.getId(), post.getId()).isPresent()) {
-            // Idempotent: trả 200 kèm message chứ không phải lỗi
             return new PostDtos.ReactResponse("You have already liked this post");
         }
 
         postLikeRepository.save(PostLike.builder().post(post).account(account).build());
 
-        // Sau nhánh idempotent phía trên: thích lại bài đã thích không sinh thêm thông báo nào.
-        // Bỏ thích rồi thích lại thì có — đó là một lượt thích mới thật sự.
         notificationPublisher.postLiked(accountId, ownerAccountIdOf(post), post.getId());
 
         return new PostDtos.ReactResponse("Like post successfully");
@@ -240,12 +220,10 @@ public class PostService {
         return new PostDtos.ReactResponse("Unlike post successfully");
     }
 
-    /** Tác giả bài; {@code null} với bài dữ liệu cũ không còn quy được về tài khoản nào */
     private Integer ownerAccountIdOf(Post post) {
         return post.getAccount() == null ? null : post.getAccount().getId();
     }
 
-    /** Ảnh/video đã upload xong lên Cloudinary, chờ gắn vào bài */
     public record UploadedMedia(String url, MediaType type) {
     }
 }

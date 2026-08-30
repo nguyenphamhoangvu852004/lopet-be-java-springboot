@@ -9,19 +9,7 @@ import com.nguyenvu.lopet.account.entity.Account;
 import com.nguyenvu.lopet.post.entity.Post;
 import com.nguyenvu.lopet.post.entity.PostLike;
 import com.nguyenvu.lopet.post.entity.PostScope;
-import com.nguyenvu.lopet.post.entity.PostType;
 
-/**
- * Bài viết KHÔNG có tác giả phải map được, không được ném.
- *
- * <p>{@code posts.account_id} là cột NULLABLE — dữ liệu cũ có thể còn hàng không quy được về tài
- * khoản nào, và script di trú cố ý GIỮ LẠI những bài đó thay vì xoá nội dung người dùng đã viết
- * (xem {@code scripts/revert-pet-to-account-migration.sql} bước 5).
- *
- * <p>Bộ test này tồn tại vì một lỗi thật: mapper gọi thẳng {@code post.getAccount().getId()} và cả
- * trang feed vỡ bằng NullPointerException ngay khi có MỘT hàng như vậy. Mapper chạy trên đường ĐỌC,
- * nên một hàng dữ liệu cũ không được phép làm hỏng phản hồi của mọi người.
- */
 @DisplayName("PostMapper — bài không có tác giả")
 class PostMapperNullAuthorTest {
 
@@ -30,7 +18,6 @@ class PostMapperNullAuthorTest {
                 .id(1)
                 .account(null)
                 .content("bai cu khong con tac gia")
-                .postType(PostType.USER)
                 .postScope(PostScope.PUBLIC)
                 .build();
     }
@@ -51,11 +38,6 @@ class PostMapperNullAuthorTest {
         assertThat(PostMapper.toDetail(postWithoutAuthor()).accountId()).isNull();
     }
 
-    /**
-     * Lượt thích mất tài khoản bị BỎ QUA khỏi danh sách, nhưng {@code likeAmount} vẫn đếm đủ: số
-     * đếm lấy từ {@code postLikes.size()}, còn danh sách chỉ dùng để hiện AI đã thích — một dòng
-     * không có danh tính thì không hiện được gì.
-     */
     @Test
     @DisplayName("lượt thích mất tài khoản bị bỏ qua, nhưng vẫn được đếm")
     void luot_thich_mat_tai_khoan() {

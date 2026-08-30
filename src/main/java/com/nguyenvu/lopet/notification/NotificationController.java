@@ -33,7 +33,6 @@ public class NotificationController {
     @Auth
     public ApiResponse<NotificationDtos.CreateNotificationResponse> create(
             @RequestBody NotificationDtos.CreateNotificationRequest request) {
-        // actor luôn là người gọi, lấy từ token
         NotificationDtos.CreateNotificationResponse response = notificationService.create(
                 CurrentUser.require().id(), request.receptorId(), request.content(), request.objectType());
 
@@ -46,17 +45,12 @@ public class NotificationController {
         return ApiResponse.created("Create notification successfully", response);
     }
 
-    /**
-     * Không kiểm người gọi có phải {@code receptor} hay không — bản TS cũng vậy. Đây là hành vi hiện
-     * tại của backend, được ghi lại nguyên trạng ở MIGRATION_FINAL_REPORT thay vì tự ý siết thêm.
-     */
     @GetMapping("/{id}")
     @Auth
     public ApiResponse<NotificationDtos.NotificationDetail> getDetail(@PathVariable Integer id) {
         return ApiResponse.ok("Get notification detail successfully", notificationService.getDetail(id));
     }
 
-    /** {@code :id} bị bỏ qua — danh sách luôn là của chính người gọi */
     @GetMapping("/me/{id}")
     @Auth
     public ApiResponse<List<NotificationDtos.NotificationListItem>> getList(@PathVariable Integer id) {
@@ -71,8 +65,6 @@ public class NotificationController {
         NotificationDtos.UpdateNotificationResponse response =
                 notificationService.updateStatus(id, request.status());
 
-        // Destination của chính thông báo chứ không phải của người dùng — giữ đúng bản gốc
-        // (phòng object_<id>): ai đang mở thông báo đó cũng nghe được, không riêng người nhận.
         realtimeGateway.emit(RealtimeGateway.notificationTopic(id), response);
 
         return ApiResponse.ok("Update notification status successfully", response);

@@ -23,14 +23,6 @@ import com.nguyenvu.lopet.message.entity.MessageStatus;
 import com.nguyenvu.lopet.message.repository.MessageRepository;
 import com.nguyenvu.lopet.support.IntegrationTestBase;
 
-/**
- * Vòng đời trạng thái tin nhắn trên MySQL thật.
- *
- * <p>Ba nhóm bất biến được canh ở đây, tất cả đều KHÔNG kiểm được bằng mock repository vì chúng nằm
- * trong chính câu SQL: điều kiện lọc theo người nhận của các câu UPDATE hàng loạt, {@code coalesce}
- * giữ mốc thời gian cũ, và {@code deletedAt is null} viết tay bù cho {@code @SQLRestriction} không
- * áp lên bulk update.
- */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @DisplayName("Trạng thái tin nhắn")
 class MessageStatusIntegrationTest extends IntegrationTestBase {
@@ -59,7 +51,6 @@ class MessageStatusIntegrationTest extends IntegrationTestBase {
                 new RegisterRequest(email, unique, "password123", "password123")).id();
     }
 
-    /** Gửi một tin và trả về id của nó */
     private Integer send(Integer senderId, Integer receiverId, String content) {
         return messageService.create(String.valueOf(senderId), String.valueOf(receiverId), content, "").id();
     }
@@ -84,7 +75,6 @@ class MessageStatusIntegrationTest extends IntegrationTestBase {
             assertThat(response.id()).isNotNull();
             assertThat(response.status()).isEqualTo(MessageStatus.SENT);
             assertThat(response.createdAt()).isNotNull();
-            // Bốn trường của bản TS giữ nguyên hình dạng chuỗi
             assertThat(response.senderId()).isEqualTo(String.valueOf(nguoiGui));
             assertThat(response.receiverId()).isEqualTo(String.valueOf(nguoiNhan));
         }
@@ -125,11 +115,6 @@ class MessageStatusIntegrationTest extends IntegrationTestBase {
             assertThat(reload(hai).getStatus()).isEqualTo(MessageStatus.DELIVERED);
         }
 
-        /**
-         * Đây là chốt an ninh của cả luồng ack: payload đến từ client nên id trong đó là dữ liệu
-         * không tin được. Thiếu điều kiện {@code receiver.id} trong câu truy vấn thì chỉ cần đoán id
-         * là đổi được trạng thái tin nhắn của hai người xa lạ.
-         */
         @Test
         @DisplayName("id của tin gửi cho người khác bị bỏ qua, không ném lỗi")
         void khongDungDuocTinCuaNguoiKhac() {
@@ -193,7 +178,6 @@ class MessageStatusIntegrationTest extends IntegrationTestBase {
                     .as("hội thoại khác không được đụng tới").isEqualTo(MessageStatus.SENT);
         }
 
-        /** Tin nhảy thẳng SENT → READ (người dùng mở app và thấy ngay) vẫn phải có mốc nhận */
         @Test
         @DisplayName("đã xem thì đương nhiên đã nhận — deliveredAt được điền luôn")
         void daXemKeoTheoDaNhan() {
@@ -226,10 +210,6 @@ class MessageStatusIntegrationTest extends IntegrationTestBase {
     @DisplayName("Đổi trạng thái một tin")
     class DoiMotTin {
 
-        /**
-         * Hồi quy cho lỗ hổng của bản cũ: {@code MessageAccessGuard} chỉ kiểm "là một trong hai bên",
-         * nên người gửi tự đặt tin của mình thành READ và giả được dấu đã xem của đối phương.
-         */
         @Test
         @DisplayName("người gửi KHÔNG đổi được trạng thái tin của chính mình")
         void nguoiGuiKhongDoiDuoc() {

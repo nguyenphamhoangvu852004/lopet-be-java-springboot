@@ -49,10 +49,6 @@ public class Role extends BaseEntity {
     @Column(name = "description")
     private String description;
 
-    /**
-     * {@code @OnDelete} ở đây sinh ra FK {@code role_permission.role_id ON DELETE CASCADE} — đúng
-     * như bảng nối mà TypeORM tạo. Thiếu nó thì xoá một role sẽ vướng ràng buộc khoá ngoại.
-     */
     @Builder.Default
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(name = "role_permission",

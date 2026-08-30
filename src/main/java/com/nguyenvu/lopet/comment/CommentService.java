@@ -19,13 +19,6 @@ import com.nguyenvu.lopet.post.repository.PostRepository;
 
 import lombok.RequiredArgsConstructor;
 
-/**
- * Bình luận thừa hưởng quyền riêng tư của BÀI VIẾT chứa nó — không có quyền riêng tư riêng.
- *
- * <p>Trước bản vá, luồng đọc bình luận nạp bài bằng hàm không lọc còn route thì không xác thực, nên
- * danh sách bình luận (kèm username/email người bình luận) của một bài PRIVATE vẫn đọc được bởi
- * khách vãng lai dù thân bài đã được che.
- */
 @Service
 @RequiredArgsConstructor
 public class CommentService {
@@ -41,7 +34,6 @@ public class CommentService {
         Account account = accountRepository.findById(accountId)
                 .orElseThrow(() -> new BadRequestException("No account found"));
 
-        // Không bình luận được vào bài mà mình không có quyền xem
         Post post = postRepository.findVisibleById(postId, accountId)
                 .orElseThrow(() -> new BadRequestException("No post found"));
 
@@ -49,9 +41,6 @@ public class CommentService {
         if (replyCommentId != null) {
             Comment candidate = commentRepository.findDetailById(replyCommentId)
                     .orElseThrow(() -> new BadRequestException("No comment found"));
-            // Bình luận cha PHẢI thuộc đúng bài vừa được kiểm quyền ở trên. Không đối chiếu thì chỉ
-            // cần ghép postId của một bài mình xem được với replyCommentId lấy từ bài PRIVATE của
-            // người khác là tạo được reply gắn vào cây bình luận đó — tức là kiểm nhầm tài nguyên.
             if (candidate.getPost() == null || !candidate.getPost().getId().equals(post.getId())) {
                 throw new BadRequestException("No comment found");
             }
@@ -76,8 +65,6 @@ public class CommentService {
         Post post = postRepository.findVisibleById(postId, viewerId)
                 .orElseThrow(() -> new BadRequestException("No post found"));
 
-        // Bản TS gọi profileRepo theo TỪNG bình luận (N+1). Hồ sơ nay nằm trong đồ thị nạp của
-        // findAllByPostId, nên không còn truy vấn phụ nào — response không đổi.
         List<CommentDtos.CommentItem> items = commentRepository.findAllByPostId(post.getId()).stream()
                 .map(this::toItem)
                 .toList();
@@ -85,11 +72,6 @@ public class CommentService {
         return new CommentDtos.GetCommentsResponse(post.getId(), items);
     }
 
-    /**
-     * Quyền sở hữu đã được kiểm ở tầng guard trước khi vào đây và cố ý KHÔNG lặp lại: guard cho
-     * staff (quyền {@code post:delete}) bỏ qua ownership để kiểm duyệt, còn kiểm tra tại service lại
-     * chặn đúng nhóm đó.
-     */
     @Transactional
     public CommentDtos.DeleteCommentResponse delete(Integer commentId) {
         Comment comment = commentRepository.findDetailById(commentId)
@@ -123,7 +105,6 @@ public class CommentService {
                 comment.getText(), comment.getImages(), comment.getCreatedAt());
     }
 
-    /** Tác giả bài — người nhận thông báo */
     private Integer ownerAccountIdOf(Post post) {
         return post.getAccount() == null ? null : post.getAccount().getId();
     }

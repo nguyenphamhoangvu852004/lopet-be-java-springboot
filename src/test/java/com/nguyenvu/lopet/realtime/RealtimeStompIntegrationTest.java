@@ -43,22 +43,6 @@ import com.nguyenvu.lopet.support.IntegrationTestBase;
 
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * Realtime đầu-cuối trên một Tomcat thật: bắt tay WebSocket, xác thực bằng chính JWT của REST, rồi
- * một ack từ người nhận phải quay về đúng người gửi.
- *
- * <p>Thay cho {@code SocketIoJsonSupportTest} của bản netty-socketio. Test cũ phải tự lắp
- * {@code JacksonJsonSupport} và bơm {@code ByteBuf} vào nó, vì netty-socketio serialize bằng một
- * ObjectMapper Jackson 2 tách rời hoàn toàn khỏi Spring — một lớp lỗi im lặng chỉ vì hai bộ Jackson
- * có thể lệch nhau. Ở đây payload đi qua đúng converter mà ứng dụng dùng thật, nên một phép thử
- * kiểm được cả định dạng ngày lẫn đường đi của sự kiện.
- *
- * <p>Không kế thừa {@link IntegrationTestBase} được: lớp đó chạy {@code webEnvironment = MOCK}, mà
- * bắt tay WebSocket thì cần một cổng TCP thật. Vẫn dùng lại {@code jdbcUrl}/{@code redisUrl} của nó
- * để lớp test này có database riêng.
- *
- * <p>YÊU CẦU: {@code docker compose up -d mysql-docker redis}.
- */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
@@ -68,7 +52,6 @@ class RealtimeStompIntegrationTest {
     private static final String RUN = Long.toString(System.nanoTime(), 36);
     private static final long TIMEOUT_SECONDS = 10;
 
-    /** Chỉ nodeIso mới sinh ra đúng ba chữ số mili giây kèm hậu tố Z; mặc định của Jackson thì không */
     private static final String NODE_ISO = "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z";
 
     @DynamicPropertySource
@@ -98,8 +81,6 @@ class RealtimeStompIntegrationTest {
     @Autowired
     private MessageRepository messageRepository;
 
-    // ------------------------------------------------------------------ CONNECT
-
     @Test
     @DisplayName("token hợp lệ thì bắt tay xong và phiên mở")
     void connect_voi_token_hop_le() throws Exception {
@@ -122,12 +103,6 @@ class RealtimeStompIntegrationTest {
                 .isEqualTo(StompAuthChannelInterceptor.TOKEN_EXPIRED);
     }
 
-    // ------------------------------------------------------------------ SUBSCRIBE
-
-    /**
-     * Bản netty-socketio KHÔNG chặn được việc này: sự kiện {@code join room} nhận tên phòng tuỳ ý,
-     * nên một tài khoản hợp lệ vào được {@code user_<id_người_khác>} và nghe hết tin nhắn của họ.
-     */
     @Test
     @DisplayName("không subscribe được destination của người khác")
     void subscribe_destination_cua_nguoi_khac_bi_chan() throws Exception {
@@ -157,12 +132,6 @@ class RealtimeStompIntegrationTest {
         session.disconnect();
     }
 
-    // ------------------------------------------------------------------ SEND
-
-    /**
-     * Thiếu guard này thì client SEND thẳng vào destination của broker và SimpleBroker phát tán —
-     * ai cũng giả được tin nhắn đến từ người khác.
-     */
     @Test
     @DisplayName("không gửi thẳng được vào destination của broker")
     void send_vao_topic_bi_chan() throws Exception {
@@ -176,8 +145,6 @@ class RealtimeStompIntegrationTest {
         assertThat(errors.poll(TIMEOUT_SECONDS, TimeUnit.SECONDS))
                 .isEqualTo(StompAuthChannelInterceptor.FORBIDDEN_DESTINATION);
     }
-
-    // ------------------------------------------------------------------ Vòng đủ
 
     @Test
     @DisplayName("ack 'đã xem' đổi trạng thái trong DB và quay về đúng người gửi")
@@ -241,11 +208,6 @@ class RealtimeStompIntegrationTest {
         nguoiNhan.disconnect();
     }
 
-    /**
-     * Nửa còn lại của định dạng ngày: broker serialize bằng chính {@code JsonMapper} của ứng dụng,
-     * nên payload realtime và payload REST không thể lệch nhau. Kiểm bằng một mốc thời gian cố định
-     * vì mốc lấy từ database đã qua vòng làm tròn micro giây của MySQL.
-     */
     @Test
     @DisplayName("JsonMapper của ứng dụng định dạng ngày đúng như REST")
     void dinh_dang_ngay_giong_het_REST() {
@@ -260,8 +222,6 @@ class RealtimeStompIntegrationTest {
                 .contains("\"byUserId\":4");
     }
 
-    // ------------------------------------------------------------------ hạ tầng test
-
     private Integer register(String name) {
         String unique = name + "-" + RUN;
         String email = unique + "@realtime.local";
@@ -274,7 +234,6 @@ class RealtimeStompIntegrationTest {
         return jwtService.generateAccessToken(principal(accountId));
     }
 
-    /** TTL âm: chữ ký vẫn đúng (cùng secret của profile test) nhưng {@code exp} đã ở quá khứ */
     private String expiredToken(Integer accountId) {
         return new JwtService(jsonMapper, accessSecret, refreshSecret, -60, -60)
                 .generateAccessToken(principal(accountId));
@@ -305,18 +264,15 @@ class RealtimeStompIntegrationTest {
                 .get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
     }
 
-    /** Thông điệp của frame ERROR khi CONNECT bị từ chối, hoặc {@code null} nếu không có frame nào */
     private String connectError(String token) throws Exception {
         BlockingQueue<String> errors = new LinkedBlockingQueue<>();
         try {
             connect(token, errors).disconnect();
         } catch (Exception expected) {
-            // CONNECT hỏng thì future cũng hỏng — thông điệp thật nằm ở frame ERROR
         }
         return errors.poll(TIMEOUT_SECONDS, TimeUnit.SECONDS);
     }
 
-    /** Frame ERROR không có body, nên {@code handleFrame} chỉ mang header — trong đó có `message` */
     private static final class ErrorCapturingHandler extends StompSessionHandlerAdapter {
 
         private final BlockingQueue<String> errors;
@@ -327,7 +283,6 @@ class RealtimeStompIntegrationTest {
 
         @Override
         public void handleFrame(StompHeaders headers, Object payload) {
-            // StompHeaders không có accessor riêng cho header `message` của frame ERROR
             String message = headers.getFirst("message");
             if (message != null) {
                 errors.add(message);
@@ -335,7 +290,6 @@ class RealtimeStompIntegrationTest {
         }
     }
 
-    /** Đẩy payload đã convert vào hàng đợi để test poll ra; {@code Map} để đọc được cả JSON thô */
     private static final class PayloadHandler implements StompFrameHandler {
 
         private final BlockingQueue<Map<?, ?>> received;

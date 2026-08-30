@@ -23,13 +23,6 @@ import com.nguyenvu.lopet.friendship.entity.FriendshipStatus;
 import com.nguyenvu.lopet.friendship.repository.FriendshipRepository;
 import com.nguyenvu.lopet.support.IntegrationTestBase;
 
-/**
- * Phạm vi hiển thị của hồ sơ tài khoản — xem docs/ACCOUNT_PROFILE_VISIBILITY.md.
- *
- * <p>Bộ lọc chạy ở tầng QUERY ({@code AccountProfileVisibilityFilter}), nên các khẳng định ở đây đi
- * qua service thật chứ không tự dựng lại điều kiện: lọc sau khi đã nạp hồ sơ về là sai, và một test
- * tự so sánh {@code visibility} bằng tay sẽ vẫn xanh khi câu truy vấn hỏng.
- */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @DisplayName("Quyền riêng tư hồ sơ tài khoản")
 class AccountProfileVisibilityIntegrationTest extends IntegrationTestBase {
@@ -51,7 +44,6 @@ class AccountProfileVisibilityIntegrationTest extends IntegrationTestBase {
     @Autowired
     private FriendshipRepository friendshipRepository;
 
-    /** Chủ hồ sơ, một người bạn ACCEPTED, một người lạ, và một lời mời PENDING chưa được nhận */
     private Integer owner;
     private Integer friend;
     private Integer stranger;
@@ -72,17 +64,11 @@ class AccountProfileVisibilityIntegrationTest extends IntegrationTestBase {
 
             friendshipRepository.save(Friendship.builder().sender(ownerAccount).receiver(friendAccount)
                     .status(FriendshipStatus.ACCEPTED).build());
-            // PENDING KHÔNG phải bạn bè — nhánh FRIEND không được tính hàng này
             friendshipRepository.save(Friendship.builder().sender(pendingAccount).receiver(ownerAccount)
                     .status(FriendshipStatus.PENDING).build());
         });
     }
 
-    /**
-     * Dựng qua {@link AccountProfileFactory} và gắn vào phía SỞ HỮU của quan hệ 1-1: khoá ngoại nằm ở
-     * {@code accounts.account_profile_id}, nên gán {@code profile.account} (phía nghịch, mappedBy) sẽ
-     * không ghi được gì xuống DB và {@code findByAccountId} trả rỗng.
-     */
     private Account account(String name) {
         String unique = name + "-" + RUN;
         return accountRepository.save(Account.builder()
@@ -96,7 +82,6 @@ class AccountProfileVisibilityIntegrationTest extends IntegrationTestBase {
                 visibility.name());
     }
 
-    /** Người xem có đọc được hồ sơ của {@link #owner} không */
     private boolean visibleTo(Integer viewerId) {
         try {
             return profileService.findVisibleByAccountId(owner, viewerId) != null;
@@ -142,10 +127,6 @@ class AccountProfileVisibilityIntegrationTest extends IntegrationTestBase {
             assertThat(visibleTo(owner)).isTrue();
         }
 
-        /**
-         * Lời mời kết bạn chưa được chấp nhận KHÔNG mở được hồ sơ FRIEND. Bỏ điều kiện
-         * {@code status = ACCEPTED} thì chỉ cần bấm "kết bạn" là đọc được hồ sơ của bất kỳ ai.
-         */
         @Test
         @DisplayName("lời mời kết bạn PENDING không được tính là bạn bè")
         void pending_khong_phai_ban_be() {
@@ -154,12 +135,9 @@ class AccountProfileVisibilityIntegrationTest extends IntegrationTestBase {
             assertThat(visibleTo(pendingFriend)).isFalse();
         }
 
-        /** Quan hệ bạn bè hai chiều: nhánh exists phải so cả sender lẫn receiver */
         @Test
         @DisplayName("bạn bè tính cả hai chiều sender/receiver")
         void ban_be_hai_chieu() {
-            // owner là SENDER trong hàng friend_ships, friend là RECEIVER — hồ sơ của friend
-            // vì thế chỉ mở cho owner nếu truy vấn so cả chiều ngược lại.
             setVisibility(friend, ProfileVisibility.FRIEND);
 
             assertThat(profileService.findVisibleByAccountId(friend, owner)).isNotNull();
@@ -185,10 +163,6 @@ class AccountProfileVisibilityIntegrationTest extends IntegrationTestBase {
                     .isInstanceOf(BadRequestException.class);
         }
 
-        /**
-         * Form multipart gửi ô không điền dưới dạng chuỗi rỗng. Cột là NOT NULL nên ghi thẳng giá trị
-         * đã parse (null) vào đó sẽ vỡ ràng buộc — phải giữ nguyên giá trị cũ.
-         */
         @Test
         @DisplayName("chuỗi rỗng giữ nguyên giá trị cũ, không ghi NULL")
         void chuoi_rong_giu_nguyen() {
@@ -205,10 +179,6 @@ class AccountProfileVisibilityIntegrationTest extends IntegrationTestBase {
     @DisplayName("Không dò được sự tồn tại")
     class KhongDoDuoc {
 
-        /**
-         * Hồ sơ bị ẩn và tài khoản không tồn tại phải cho ra CÙNG một phản hồi. Khác nhau thì endpoint
-         * này thành công cụ liệt kê tài khoản.
-         */
         @Test
         @DisplayName("hồ sơ ẩn và tài khoản không tồn tại đều ném NotFound")
         void an_va_khong_ton_tai_giong_nhau() {
@@ -220,7 +190,6 @@ class AccountProfileVisibilityIntegrationTest extends IntegrationTestBase {
                     .isInstanceOf(NotFoundException.class);
         }
 
-        /** Hồ sơ người khác cố ý hẹp hơn hồ sơ của chính mình */
         @Test
         @DisplayName("hồ sơ người khác không trả số điện thoại / ngày sinh / quê quán")
         void ho_so_nguoi_khac_hep_hon() {
@@ -229,7 +198,6 @@ class AccountProfileVisibilityIntegrationTest extends IntegrationTestBase {
             var duocXem = profileService.findVisibleByAccountId(owner, stranger);
             assertThat(duocXem.username()).isNotBlank();
             assertThat(duocXem.fullName()).isNotBlank();
-            // PublicProfile chỉ có 7 trường; không có chỗ nào để lộ phoneNumber/dateOfBirth/hometown
             assertThat(duocXem.accountId()).isEqualTo(owner);
         }
     }

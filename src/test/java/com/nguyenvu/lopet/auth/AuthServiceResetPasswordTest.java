@@ -26,14 +26,6 @@ import com.nguyenvu.lopet.common.exception.ForbiddenException;
 import com.nguyenvu.lopet.email.OtpStore;
 import com.nguyenvu.lopet.security.jwt.JwtService;
 
-/**
- * Bản port của {@code src/modules/auth/__tests__/resetPassword.test.ts} — chốt chặn hồi quy cho lỗ
- * hổng chiếm tài khoản qua {@code POST /v1/auth/reset}.
- *
- * <p>Trước khi vá, hàm này ghi thẳng mật khẩu mới chỉ dựa trên email do client gửi lên, không đòi
- * bằng chứng nào rằng người gọi kiểm soát hòm thư đó — bất kỳ ai biết địa chỉ email đều chiếm được
- * tài khoản tương ứng, kể cả tài khoản ADMIN được seed sẵn.
- */
 @ExtendWith(MockitoExtension.class)
 class AuthServiceResetPasswordTest {
 
@@ -75,7 +67,6 @@ class AuthServiceResetPasswordTest {
         assertThatThrownBy(() -> authService.resetPassword(request(NEW_PASSWORD)))
                 .isInstanceOf(ForbiddenException.class);
 
-        // Tính chất quan trọng nhất: mật khẩu cũ còn nguyên, không có lệnh ghi nào
         assertThat(account.getPassword()).isEqualTo(OLD_PASSWORD_HASH);
         verify(accountRepository, never()).save(any());
     }
@@ -91,7 +82,6 @@ class AuthServiceResetPasswordTest {
         assertThat(result.email()).isEqualTo(VICTIM_EMAIL);
         verify(accountRepository).save(account);
         assertThat(account.getPassword()).isNotEqualTo(OLD_PASSWORD_HASH);
-        // Mật khẩu phải được băm, không lưu plaintext
         assertThat(account.getPassword()).isNotEqualTo(NEW_PASSWORD);
         assertThat(passwordEncoder.matches(NEW_PASSWORD, account.getPassword())).isTrue();
     }
@@ -104,8 +94,6 @@ class AuthServiceResetPasswordTest {
 
         authService.resetPassword(request(NEW_PASSWORD));
 
-        // GETDEL đọc-và-xoá trong một lệnh; tách get rồi del sẽ để hở cửa sổ cho hai request song
-        // song cùng đi qua, tức một lần OTP đổi được nhiều lần mật khẩu.
         verify(otpStore).consumeVerifiedFlag(VICTIM_EMAIL);
         verify(otpStore, never()).findVerifiedFlag(anyString());
     }
@@ -121,7 +109,6 @@ class AuthServiceResetPasswordTest {
 
         assertThat(account.getPassword()).isEqualTo(OLD_PASSWORD_HASH);
         verify(accountRepository, never()).save(any());
-        // Không khớp thì cờ OTP cũng chưa bị tiêu thụ — người dùng gõ lại được ngay
         verify(otpStore, never()).consumeVerifiedFlag(anyString());
     }
 }

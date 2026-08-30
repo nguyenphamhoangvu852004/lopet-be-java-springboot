@@ -12,10 +12,6 @@ import com.nguyenvu.lopet.account.entity.Account;
 
 public interface AccountRepository extends JpaRepository<Account, Integer> {
 
-    /**
-     * Bản nạp kèm quan hệ, tương ứng {@code findById} của AccountRepoImpl (relations: profile +
-     * accountRoles.role). Hầu hết luồng nghiệp vụ dùng bản này.
-     */
     @EntityGraph(attributePaths = {"accountProfile", "accountRoles", "accountRoles.role"})
     @Query("select a from Account a where a.id = :id")
     Optional<Account> findDetailById(@Param("id") Integer id);
@@ -34,13 +30,6 @@ public interface AccountRepository extends JpaRepository<Account, Integer> {
 
     boolean existsByEmail(String email);
 
-    /**
-     * Gợi ý kết bạn. Ba điều kiện lấy nguyên từ {@code AccountRepoImpl.getSuggest}: loại mọi tài
-     * khoản đã có quan hệ friendship ở BẤT KỲ trạng thái nào, loại chính mình, loại tài khoản bị khoá.
-     *
-     * <p>{@code ORDER BY RAND()} được giữ nguyên — tính ngẫu nhiên là một phần hành vi của endpoint,
-     * không phải chi tiết cài đặt.
-     */
     @Query(value = """
             select * from accounts a
             where a.deletedAt is null
@@ -56,10 +45,6 @@ public interface AccountRepository extends JpaRepository<Account, Integer> {
             """, nativeQuery = true)
     List<Account> findSuggestions(@Param("accountId") Integer accountId);
 
-    /**
-     * Bản có giới hạn số lượng. Tách riêng vì bên TS {@code .limit(NaN)} rơi vào nhánh falsy của
-     * TypeORM nên câu lệnh KHÔNG có LIMIT — tức là thiếu tham số {@code limit} thì trả về tất cả.
-     */
     @Query(value = """
             select * from accounts a
             where a.deletedAt is null

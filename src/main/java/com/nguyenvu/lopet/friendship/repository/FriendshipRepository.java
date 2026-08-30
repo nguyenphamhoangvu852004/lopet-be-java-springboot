@@ -12,15 +12,10 @@ import com.nguyenvu.lopet.friendship.entity.FriendshipStatus;
 
 public interface FriendshipRepository extends JpaRepository<Friendship, Integer> {
 
-    /**
-     * Chỉ dò ĐÚNG chiều gửi→nhận. Bản TS cũng vậy, nên hai bản ghi ngược chiều giữa cùng một cặp
-     * tài khoản có thể cùng tồn tại — không được "sửa" thành dò hai chiều ở đây.
-     */
     @Query("select f from Friendship f where f.sender.id = :senderId and f.receiver.id = :receiverId")
     Optional<Friendship> findBySenderAndReceiver(@Param("senderId") Integer senderId,
                                                  @Param("receiverId") Integer receiverId);
 
-    /** Đã là bạn bè (ACCEPTED) hay chưa, xét cả hai chiều */
     @Query("""
             select count(f) from Friendship f
             where f.status = com.nguyenvu.lopet.friendship.entity.FriendshipStatus.ACCEPTED
@@ -43,7 +38,6 @@ public interface FriendshipRepository extends JpaRepository<Friendship, Integer>
             """)
     List<Friendship> findAcceptedOf(@Param("accountId") Integer accountId);
 
-    /** Mọi quan hệ (bất kể trạng thái) của một tập tài khoản — dùng dựng danh sách tài khoản */
     @Query("select f from Friendship f where f.sender.id in :ids or f.receiver.id in :ids")
     List<Friendship> findAllInvolving(@Param("ids") List<Integer> accountIds);
 }

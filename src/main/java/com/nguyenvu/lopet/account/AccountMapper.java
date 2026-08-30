@@ -18,7 +18,6 @@ import com.nguyenvu.lopet.friendship.entity.Friendship;
 import com.nguyenvu.lopet.accountprofile.entity.AccountProfile;
 import com.nguyenvu.lopet.role.entity.Role;
 
-/** Ánh xạ entity → hình dạng JSON mà lopet-be trả về. Mọi hàm ở đây chịu null an toàn. */
 public final class AccountMapper {
 
     public static GetAccountResponse toGetAccountResponse(Account account) {
@@ -93,7 +92,6 @@ public final class AccountMapper {
                 friendshipViews(receivedByAccount.get(account.getId())));
     }
 
-    /** Set của Hibernate không giữ thứ tự — sắp theo roleId để danh sách ổn định giữa các lần gọi */
     private static List<AccountRoleView> sortedRoles(Account account) {
         return account.getAccountRoles().stream()
                 .sorted(Comparator.comparing(AccountRole::getRoleId))

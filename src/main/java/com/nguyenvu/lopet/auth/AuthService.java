@@ -37,12 +37,6 @@ public class AuthService {
     private final JwtService jwtService;
     private final OtpStore otpStore;
 
-    /**
-     * Thứ tự kiểm tra giữ nguyên: tồn tại → bị khoá → so khớp mật khẩu. Đổi thứ tự sẽ đổi mã lỗi mà
-     * client nhận được trong các tình huống chồng nhau.
-     *
-     * <p>Tài khoản bị khoá trả 400 (không phải 403) — đó là hành vi hiện tại của backend.
-     */
     @Transactional(readOnly = true)
     public IssuedTokens login(LoginRequest request) {
         Account account = accountRepository.findDetailByUsername(request.username())
@@ -61,33 +55,9 @@ public class AuthService {
                 jwtService.generateRefreshToken(payload));
     }
 
-    /**
-     * Cấp lại cặp token từ refresh token. Đây là đường duy nhất để một phiên sống lâu hơn
-     * {@code ACCESS_TOKEN_EXPIRES_IN} (1 giờ) — trước đó access token hết hạn đồng nghĩa người dùng
-     * bị đá về màn hình đăng nhập giữa chừng.
-     *
-     * <p>Ba điểm cố ý:
-     *
-     * <ul>
-     *   <li><b>Đọc lại tài khoản từ DB thay vì tin claim trong token.</b> Roles được ký vào access
-     *       token, nên nếu chỉ ký lại payload cũ thì một lần thu hồi quyền phải chờ tới khi refresh
-     *       token hết hạn (10 giờ) mới có hiệu lực. Đọc lại DB khiến mỗi lần gia hạn là một lần
-     *       đồng bộ quyền.</li>
-     *   <li><b>Tài khoản bị khoá thì cắt phiên ngay,</b> và trả 401 chứ không phải 400 như
-     *       {@link #login} — 400 chỉ là thông báo cho form đăng nhập, còn ở đây client cần một mã
-     *       khiến interceptor xoá phiên và đưa về trang đăng nhập. Đây cũng là cơ chế thu hồi duy
-     *       nhất hiện có: ban tài khoản chặn được việc gia hạn, dù access token đang lưu hành vẫn
-     *       sống hết phần hạn còn lại của nó.</li>
-     *   <li><b>Xoay vòng refresh token.</b> Không lưu trạng thái nên token cũ vẫn dùng được tới khi
-     *       hết hạn — chưa phải chống tái sử dụng thật sự, nhưng cho phép client hoạt động liên tục
-     *       giữ phiên trượt theo thời gian thay vì bị cắt cứng sau 10 giờ.</li>
-     * </ul>
-     */
     @Transactional(readOnly = true)
     public IssuedTokens refresh(String refreshToken) {
         if (refreshToken == null || refreshToken.isBlank()) {
-            // Thiếu cookie và cookie hỏng về cùng một mã: với client thì cả hai đều nghĩa là "phiên
-            // không còn, đăng nhập lại", và tách ra chỉ nói cho người dò biết họ đoán sai ở bước nào.
             throw new UnauthorizedException("Refresh token không hợp lệ");
         }
 
@@ -95,8 +65,6 @@ public class AuthService {
         try {
             claims = jwtService.parseRefreshToken(refreshToken);
         } catch (JwtException exception) {
-            // Gộp "hết hạn" và "sai chữ ký" về cùng một mã: cả hai đều kết thúc phiên, và phân biệt
-            // ra ngoài chỉ giúp người dò token biết mình đoán đúng khoá hay chưa.
             throw new UnauthorizedException(exception.isExpired()
                     ? "Refresh token đã hết hạn"
                     : "Refresh token không hợp lệ");
@@ -119,10 +87,6 @@ public class AuthService {
                 jwtService.generateRefreshToken(payload));
     }
 
-    /**
-     * Đăng ký bắt buộc đã qua OTP. Cờ được XOÁ ngay trước khi kiểm tra trùng email/username — giữ
-     * nguyên thứ tự của bản TS: đăng ký trùng thì cờ đã mất và người dùng phải xin OTP lại.
-     */
     @Transactional
     public RegisterResponse register(RegisterRequest request) {
         String verified = otpStore.findVerifiedFlag(request.email());
@@ -141,9 +105,6 @@ public class AuthService {
             throw new BadRequestException();
         }
 
-        // Hồ sơ được cấp ngay tại đây thay vì để người dùng tự tạo bằng request riêng. Quan hệ
-        // Account.profile khai cascade PERSIST nên JPA insert `profiles` rồi set `accounts.profileId`
-        // trong cùng transaction — đăng ký hỏng thì không để lại hồ sơ mồ côi.
         Account saved = accountRepository.save(Account.builder()
                 .email(request.email())
                 .username(request.username())
@@ -155,13 +116,6 @@ public class AuthService {
         return new RegisterResponse(saved.getId(), saved.getEmail(), saved.getUsername());
     }
 
-    /**
-     * Đổi mật khẩu qua email — luồng KHÔNG cần đăng nhập, nên bắt buộc phải có bằng chứng người gọi
-     * kiểm soát được hòm thư của tài khoản đó. Thiếu bước này thì bất kỳ ai biết địa chỉ email đều
-     * chiếm được tài khoản tương ứng, kể cả tài khoản ADMIN được seed sẵn.
-     *
-     * <p>Cờ được tiêu thụ TRƯỚC khi ghi mật khẩu để luồng này luôn fail-closed.
-     */
     @Transactional
     public ResetPasswordResponse resetPassword(ResetPasswordRequest request) {
         if (!request.password().equals(request.confirmPassword())) {

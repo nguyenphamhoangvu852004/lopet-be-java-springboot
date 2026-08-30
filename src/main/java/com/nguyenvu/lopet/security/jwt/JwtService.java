@@ -18,7 +18,6 @@ import org.springframework.stereotype.Service;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
-
 @Service
 public class JwtService {
 
@@ -52,7 +51,6 @@ public class JwtService {
     public String generateRefreshToken(UserPrincipal payload) {
         return sign(payload, refreshSecret, refreshTtlSeconds);
     }
-
 
     public UserPrincipal parseAccessToken(String token) {
         return parse(token, accessSecret);
@@ -93,7 +91,6 @@ public class JwtService {
             throw new JwtException(JwtException.MALFORMED);
         }
 
-        // isEqual so sánh trong thời gian hằng — tránh rò rỉ chữ ký đúng qua thời gian phản hồi
         if (!MessageDigest.isEqual(expected, actual)) {
             throw new JwtException(JwtException.INVALID_SIGNATURE);
         }

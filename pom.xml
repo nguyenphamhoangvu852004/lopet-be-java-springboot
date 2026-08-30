@@ -25,7 +25,12 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-jpa</artifactId>
 		</dependency>
-		<!-- Source: https://mvnrepository.com/artifact/com.github.javafaker/javafaker -->
+		<dependency>
+			<groupId>com.rabbitmq</groupId>
+			<artifactId>amqp-client</artifactId>
+			<version>5.34.0</version>
+			<scope>compile</scope>
+		</dependency>
 		<dependency>
 			<groupId>com.github.javafaker</groupId>
 			<artifactId>javafaker</artifactId>
@@ -54,37 +59,17 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-redis</artifactId>
 		</dependency>
-		<!--
-			Mail đi qua HTTP API của Resend thay cho spring-boot-starter-mail/SMTP: các nền tảng
-			hosting (Railway, Render...) chặn cổng 587/465 ra ngoài, nên SMTP không dùng được ở
-			production. SDK kéo theo okhttp + jackson 2 ở scope runtime, dùng ObjectMapper riêng
-			nên không đụng tới cấu hình Jackson của app (xem config/JacksonConfig).
-		-->
 		<dependency>
 			<groupId>com.resend</groupId>
 			<artifactId>resend-java</artifactId>
 			<version>${resend.version}</version>
 		</dependency>
 
-		<!-- Boot 4 đổi tên spring-boot-starter-aop thành spring-boot-starter-aspectj -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-aspectj</artifactId>
 		</dependency>
 
-		<!--
-			JWT HS256 được hiện thực bằng JCA trong security/jwt/JwtService thay vì jjwt/Nimbus:
-			cả hai thư viện đó ép khoá HMAC tối thiểu 256 bit theo RFC 7518, trong khi
-			ACCESS_TOKEN_SECRET đang dùng của lopet-be chỉ dài 23 byte. Ép khoá dài hơn sẽ khiến
-			file .env hiện tại không chạy được, tức là không còn thay thế trực tiếp được nữa.
-		-->
-
-		<!--
-			Realtime là STOMP over WebSocket chạy ngay trên Tomcat (cổng 8080), thay cho netty-socketio
-			vốn phải mở một server Netty độc lập ở cổng riêng. Ngoài việc bớt được một cổng phải publish
-			và proxy, starter này dùng chung ObjectMapper (Jackson 3) với REST — payload realtime và
-			payload REST không còn có thể lệch định dạng nữa, xem config/JacksonConfig.
-		-->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-websocket</artifactId>
@@ -132,7 +117,6 @@
 			<artifactId>spring-boot-starter-websocket-test</artifactId>
 			<scope>test</scope>
 		</dependency>
-		<!-- Source: https://mvnrepository.com/artifact/org.springframework.boot/spring-boot-actuator -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-actuator</artifactId>

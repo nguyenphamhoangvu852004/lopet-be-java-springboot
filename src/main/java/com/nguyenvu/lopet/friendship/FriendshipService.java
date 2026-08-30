@@ -24,7 +24,6 @@ public class FriendshipService {
     private final AccountRepository accountRepository;
     private final NotificationPublisher notificationPublisher;
 
-    /** Lời mời PENDING mà người gọi ĐÃ GỬI đi */
     @Transactional(readOnly = true)
     public FriendshipDtos.FriendshipListResponse getSentRequests(Integer accountId) {
         Account account = requireAccount(accountId);
@@ -35,7 +34,6 @@ public class FriendshipService {
         return new FriendshipDtos.FriendshipListResponse(person(account, null), others);
     }
 
-    /** Lời mời PENDING mà người gọi NHẬN được */
     @Transactional(readOnly = true)
     public FriendshipDtos.FriendshipListResponse getReceivedRequests(Integer accountId) {
         Account account = requireAccount(accountId);
@@ -46,7 +44,6 @@ public class FriendshipService {
         return new FriendshipDtos.FriendshipListResponse(person(account, null), others);
     }
 
-    /** Bạn bè ACCEPTED của một tài khoản, xét cả hai chiều gửi/nhận */
     @Transactional(readOnly = true)
     public FriendshipDtos.FriendshipListResponse getFriends(Integer accountId) {
         Account account = requireAccount(accountId);
@@ -59,10 +56,6 @@ public class FriendshipService {
         return new FriendshipDtos.FriendshipListResponse(person(account, null), others);
     }
 
-    /**
-     * Chỉ chặn trùng ĐÚNG CHIỀU gửi→nhận, giống bản TS: nếu B đã gửi cho A thì A vẫn gửi được cho B
-     * và bảng có hai bản ghi ngược chiều. Không "sửa" thành dò hai chiều ở đây — đó là đổi nghiệp vụ.
-     */
     @Transactional
     public FriendshipDtos.CreateFriendshipResponse create(Integer senderId, Integer receiverId) {
         Account sender = requireAccount(senderId);
@@ -84,10 +77,6 @@ public class FriendshipService {
                 saved.getCreatedAt());
     }
 
-    /**
-     * Đổi trạng thái lời mời. {@code receiverId} luôn là người gọi (lấy từ token), nên chỉ người
-     * NHẬN mới chấp nhận/từ chối được lời mời gửi cho mình.
-     */
     @Transactional
     public FriendshipDtos.ChangeStatusResponse changeStatus(Integer senderId, Integer receiverId,
                                                             FriendshipStatus status) {
@@ -99,8 +88,6 @@ public class FriendshipService {
         friendship.setStatus(status);
         Friendship saved = friendshipRepository.save(friendship);
 
-        // Chỉ báo khi lời mời được CHẤP NHẬN. Từ chối thì im lặng: người bị từ chối không cần một
-        // dòng thông báo nhắc lại chuyện đó, và bản TS cũng chưa bao giờ gửi.
         if (status == FriendshipStatus.ACCEPTED) {
             notificationPublisher.friendAccepted(receiverId, senderId);
         }
@@ -109,11 +96,6 @@ public class FriendshipService {
                 saved.getReceiver().getId(), saved.getStatus());
     }
 
-    /**
-     * Huỷ kết bạn. Một đầu LUÔN là chính người gọi — trước bản vá, endpoint nhận cả senderId lẫn
-     * receiverId từ body và không đối chiếu người gọi, nên bất kỳ ai đăng nhập cũng huỷ được quan hệ
-     * bạn bè giữa hai người xa lạ.
-     */
     @Transactional
     public FriendshipDtos.DeleteFriendshipResponse delete(Integer callerId, Integer friendId) {
         requireAccountOrMessage(callerId);
@@ -130,7 +112,6 @@ public class FriendshipService {
         return new FriendshipDtos.DeleteFriendshipResponse(senderId, receiverId, true);
     }
 
-    /** Hai tài khoản đã là bạn bè hay chưa — dùng bởi guard bảo vệ danh sách bạn bè */
     @Transactional(readOnly = true)
     public boolean areFriends(Integer accountIdA, Integer accountIdB) {
         if (accountIdA.equals(accountIdB)) {

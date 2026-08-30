@@ -23,17 +23,6 @@ import com.nguyenvu.lopet.accountprofile.entity.AccountProfile;
 import com.nguyenvu.lopet.accountprofile.repository.AccountProfileRepository;
 import com.nguyenvu.lopet.support.IntegrationTestBase;
 
-/**
- * Refactor module AccountProfile ở tầng SERVICE, trên MySQL thật.
- *
- * <p>Ba thứ được canh ở đây, và cả ba đều là hồi quy chứ không phải tính năng mới:
- * <ul>
- *   <li>hồ sơ phải được cấp trên CẢ HAI đường tạo tài khoản (đăng ký thường và bootstrap admin) —
- *       vá một đường là vẫn còn tài khoản không có hồ sơ;</li>
- *   <li>cập nhật không kèm file KHÔNG được xoá ảnh — đó là bug của bản PATCH cũ;</li>
- *   <li>không đường nào sửa được hồ sơ của người khác.</li>
- * </ul>
- */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @DisplayName("AccountProfile Refactor")
 class AccountProfileRefactorIntegrationTest extends IntegrationTestBase {
@@ -42,11 +31,6 @@ class AccountProfileRefactorIntegrationTest extends IntegrationTestBase {
     private static final String ADMIN_EMAIL = "profile-admin@lopet.local";
     private static final String ADMIN_USERNAME = "profile-admin";
 
-    /**
-     * Database riêng, và BẬT {@code lopet.admin.*} (application-test.yml cố ý để rỗng). Bật lên thì
-     * {@code StartupRunner} chạy {@code AdminInitializer.init()} lúc dựng context — đó chính là
-     * đường tạo tài khoản thứ hai mà bài test này cần kiểm.
-     */
     @DynamicPropertySource
     static void configuration(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", () -> IntegrationTestBase.jdbcUrl("lopet_java_profile_test"));
@@ -66,7 +50,6 @@ class AccountProfileRefactorIntegrationTest extends IntegrationTestBase {
     @Autowired
     private OtpStore otpStore;
 
-    /** Đăng ký thật qua AuthService — register() đòi cờ OTP nên phải đặt cờ trước */
     private Integer register(String name) {
         String unique = name + "-" + RUN;
         String email = unique + "@profile.local";
@@ -100,7 +83,6 @@ class AccountProfileRefactorIntegrationTest extends IntegrationTestBase {
             assertThat(profile.getDateOfBirth()).isNull();
         }
 
-        /** Đường tạo tài khoản THỨ HAI: AdminInitializer gọi thẳng accountRepository, không qua register() */
         @Test
         @DisplayName("tài khoản admin do bootstrap tạo cũng có hồ sơ")
         void adminBootstrapCungCoHoSo() {
@@ -161,10 +143,6 @@ class AccountProfileRefactorIntegrationTest extends IntegrationTestBase {
             assertThat(sau.bio()).isEmpty();
         }
 
-        /**
-         * Hồi quy cho bug của bản PATCH cũ: controller luôn truyền chuỗi rỗng cho avatar/cover khi
-         * request không đính file, nên mỗi lần sửa bio là xoá luôn ảnh đại diện.
-         */
         @Test
         @DisplayName("cập nhật không kèm file thì KHÔNG xoá ảnh đang có")
         void khongDinhFileThiGiuNguyenAnh() {
@@ -172,7 +150,6 @@ class AccountProfileRefactorIntegrationTest extends IntegrationTestBase {
             profileService.updateMine(accountId, null, null, null,
                     "https://cdn.local/avatar.png", "https://cdn.local/cover.png", null, null, null, null);
 
-            // Đúng thứ controller truyền xuống khi người dùng chỉ sửa bio: hai trường ảnh là null
             AccountProfileDtos.ProfileEntity sau = profileService.updateMine(accountId, null, null,
                     "Chỉ sửa bio thôi", null, null, null, null, null, null);
 
@@ -186,11 +163,6 @@ class AccountProfileRefactorIntegrationTest extends IntegrationTestBase {
     @DisplayName("Cách ly giữa các tài khoản")
     class CachLy {
 
-        /**
-         * Trước refactor, {@code POST /v1/profiles/{id}} nhận profileId tuỳ ý và không kiểm sở hữu,
-         * nên gắn được hồ sơ của người khác vào tài khoản mình. Giờ hồ sơ chỉ tra được bằng
-         * accountId lấy từ token — không còn tham số nào để trỏ sang người khác.
-         */
         @Test
         @DisplayName("sửa hồ sơ của mình không đụng tới hồ sơ người khác")
         void suaHoSoMinhKhongDungNguoiKhac() {
@@ -234,7 +206,6 @@ class AccountProfileRefactorIntegrationTest extends IntegrationTestBase {
             assertThat(cuaToi.fullName()).isEqualTo("Tên hiển thị");
         }
 
-        /** Tài khoản cũ chưa backfill: lỗi phải chỉ thẳng sang script migration thay vì 500 khó hiểu */
         @Test
         @DisplayName("tài khoản không có hồ sơ thì cập nhật báo lỗi chỉ rõ cần backfill")
         void thieuHoSoThiBaoLoiRoRang() {

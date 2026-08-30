@@ -12,14 +12,6 @@ import com.nguyenvu.lopet.common.exception.BadRequestException;
 
 import lombok.RequiredArgsConstructor;
 
-/**
- * Thay cho cặp {@code multer + cloudinary} bên TS. Điểm khác về kỹ thuật: Express ghi file ra đĩa
- * tạm rồi upload theo đường dẫn, Spring giữ luôn trong bộ nhớ và upload theo mảng byte — kết quả
- * trả về ({@code secure_url}) và thứ tự tác dụng phụ thì giống hệt.
- *
- * <p>Mọi lời gọi upload phải nằm SAU các tầng kiểm quyền: bản TS cố ý đặt middleware trước
- * {@code upload.single()} để request bị từ chối không kịp tốn một lượt upload.
- */
 @Service
 @RequiredArgsConstructor
 public class CloudinaryService {
@@ -29,7 +21,6 @@ public class CloudinaryService {
 
     private final Cloudinary cloudinary;
 
-    /** @return {@code secure_url} của tài nguyên vừa upload */
     public String upload(MultipartFile file, String resourceType) {
         try {
             Map<String, Object> options = new HashMap<>();
@@ -41,7 +32,6 @@ public class CloudinaryService {
         }
     }
 
-    /** Bản mặc định resource_type=image — dùng cho group/comment/message/ads */
     public String uploadImage(MultipartFile file) {
         return upload(file, IMAGE);
     }

@@ -23,7 +23,9 @@ import com.nguyenvu.lopet.message.entity.MessageStatus;
 import com.nguyenvu.lopet.realtime.RealtimeGateway;
 import com.nguyenvu.lopet.security.Auth;
 import com.nguyenvu.lopet.security.CurrentUser;
-
+import com.nguyenvu.lopet.security.rebac.ObjectRef;
+import com.nguyenvu.lopet.security.rebac.RebacEngine;
+import com.nguyenvu.lopet.security.rebac.RebacModel;
 
 import lombok.RequiredArgsConstructor;
 
@@ -33,7 +35,7 @@ import lombok.RequiredArgsConstructor;
 public class MessageController {
 
     private final MessageService messageService;
-    private final MessageAccessGuard messageAccessGuard;
+    private final RebacEngine rebac;
     private final CloudinaryService cloudinaryService;
     private final RealtimeGateway realtimeGateway;
     private final MessageStatusNotifier messageStatusNotifier;
@@ -41,7 +43,7 @@ public class MessageController {
     @GetMapping("/{id}")
     @Auth
     public ApiResponse<MessageDtos.MessageResponse> getDetail(@PathVariable Integer id) {
-        messageAccessGuard.requireParticipant(id);
+        rebac.require(RebacModel.MESSAGE_READ, ObjectRef.message(id));
         return ApiResponse.ok("Get detail message successfully", messageService.getDetail(id));
     }
 
@@ -49,21 +51,13 @@ public class MessageController {
     @Auth
     public ApiResponse<MessageDtos.ChangeStatusResponse> updateStatus(
             @PathVariable Integer id, @RequestBody MessageDtos.ChangeStatusRequest request) {
-        messageAccessGuard.requireParticipant(id);
+        rebac.require(RebacModel.MESSAGE_READ, ObjectRef.message(id));
         messageStatusNotifier.broadcast(messageService.changeStatus(CurrentUser.require().id(), id,
                 MessageStatus.valueOf(request.status())));
         return ApiResponse.ok("Update message successfully",
                 new MessageDtos.ChangeStatusResponse(true, "Update message successfully"));
     }
 
-    /**
-     * Đường lui REST cho ack "đã nhận", tương đương sự kiện socket {@code message delivered} —
-     * dùng khi client không giữ được socket (app vừa mở lại, mạng chập chờn).
-     *
-     * <p>Không có {@code messageAccessGuard} ở đây một cách CÓ CHỦ Ý: guard làm việc trên từng id
-     * và sẽ ném 403 cho cả lô chỉ vì một id lạc. Việc lọc nằm trong câu truy vấn — nó chỉ nhận
-     * những tin có {@code receiver} đúng là người gọi, nên id của người khác âm thầm bị bỏ qua.
-     */
     @PatchMapping("/delivered")
     @Auth
     public ApiResponse<MessageDtos.MarkStatusResponse> markDelivered(
@@ -75,7 +69,6 @@ public class MessageController {
                 new MessageDtos.MarkStatusResponse(result.count(), MessageStatus.DELIVERED));
     }
 
-    /** Đánh dấu đã xem cả hội thoại với {@code partnerId} — một request cho một lần mở cuộc trò chuyện */
     @PatchMapping("/read")
     @Auth
     public ApiResponse<MessageDtos.MarkStatusResponse> markRead(@RequestParam Integer partnerId) {
@@ -86,13 +79,6 @@ public class MessageController {
                 new MessageDtos.MarkStatusResponse(result.count(), MessageStatus.READ));
     }
 
-    /**
-     * Danh sách id tin đang chờ ack "đã nhận" — client gọi ngay sau khi socket kết nối, rồi ack lại
-     * bằng chính hai đường có sẵn ({@code message delivered} hoặc {@code PATCH /delivered}).
-     *
-     * <p>Không có bước này, tin gửi lúc người nhận đã đăng xuất sẽ kẹt ở "đã gửi" mãi mãi: không
-     * socket nào chuyển chúng đi nên chẳng có ack nào được phát, kể cả sau khi họ đăng nhập lại.
-     */
     @GetMapping("/pending-delivery")
     @Auth
     public ApiResponse<List<Integer>> pendingDelivery() {
@@ -100,7 +86,6 @@ public class MessageController {
                 messageService.awaitingDelivery(CurrentUser.require().id()));
     }
 
-    /** Badge tổng số tin chưa đọc của người gọi */
     @GetMapping("/unread-count")
     @Auth
     public ApiResponse<MessageDtos.UnreadCountResponse> unreadCount() {
@@ -109,11 +94,6 @@ public class MessageController {
                         messageService.countUnread(CurrentUser.require().id())));
     }
 
-    /**
-     * Người đối thoại lấy từ query {@code ?targetId=}, KHÔNG phải từ {@code :id} trên đường dẫn —
-     * controller TS bỏ qua path param và đọc {@code req.query.targetId}. Client hiện tại phụ thuộc
-     * đúng hình dạng URL này.
-     */
     @GetMapping("/me/{id}")
     @Auth
     public ApiResponse<List<MessageDtos.MessageResponse>> getConversation(@PathVariable Integer id,
@@ -139,7 +119,6 @@ public class MessageController {
         MessageDtos.CreateMessageResponse response = messageService.create(senderId, receiverId,
                 content == null ? "" : content, imageUrl);
 
-        // Đẩy tới destination riêng của người nhận; chỉ chính chủ subscribe được vào đó
         realtimeGateway.emit(
                 RealtimeGateway.userTopic(receiverId, RealtimeGateway.CHANNEL_CHAT),
                 new MessageDtos.ChatMessageEvent(response, senderId));

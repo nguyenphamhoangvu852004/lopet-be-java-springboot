@@ -26,15 +26,6 @@ import com.nguyenvu.lopet.security.jwt.JwtAuthenticationFilter;
 
 import jakarta.servlet.http.Cookie;
 
-/**
- * Dựng MockMvc standalone kèm ĐÚNG {@link AuthInterceptor} thật, vì điều cần chốt ở đây là chuyện
- * định tuyến/chặn chứ không phải nghiệp vụ: người gọi {@code /v1/auth/refresh} luôn là người có
- * access token đã hỏng hoặc hết hạn, nên endpoint này KHÔNG được đòi token hợp lệ. Gắn nhầm
- * {@code @Auth} vào đây sẽ khoá vĩnh viễn đường gia hạn — và không test nào khác bắt được.
- *
- * <p>Dùng {@link RefreshTokenCookie} thật chứ không mock: nửa còn lại cần chốt là refresh token
- * đi vào cookie và KHÔNG lọt ra body.
- */
 @ExtendWith(MockitoExtension.class)
 class AuthControllerRefreshTest {
 
@@ -63,13 +54,11 @@ class AuthControllerRefreshTest {
 
         mockMvc.perform(post("/v1/auth/refresh")
                         .cookie(new Cookie(COOKIE, "token-hop-le"))
-                        // Trạng thái mà filter để lại khi Authorization mang token hết hạn
                         .requestAttr(JwtAuthenticationFilter.ATTRIBUTE_STATE,
                                 JwtAuthenticationFilter.TokenState.INVALID))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.statusCode").value(200))
                 .andExpect(jsonPath("$.data.accessToken").value("access-moi"))
-                // Token xoay vòng ra cookie, không ra body
                 .andExpect(jsonPath("$.data.refreshToken").doesNotExist())
                 .andExpect(cookie().value(COOKIE, "refresh-moi"))
                 .andExpect(cookie().httpOnly(COOKIE, true));
@@ -85,10 +74,6 @@ class AuthControllerRefreshTest {
                 .andExpect(jsonPath("$.message").value("Refresh token đã hết hạn"));
     }
 
-    /**
-     * Không còn body để validate: thiếu refresh token nghĩa là thiếu cookie, và quyết định thuộc về
-     * service — controller chỉ có nhiệm vụ chuyển {@code null} xuống thay vì tự dựng lỗi riêng.
-     */
     @Test
     void thieu_cookie_thi_service_nhan_null() throws Exception {
         when(authService.refresh(isNull())).thenThrow(new UnauthorizedException("Refresh token không hợp lệ"));
@@ -111,7 +96,6 @@ class AuthControllerRefreshTest {
                 .andExpect(jsonPath("$.data.refreshToken").doesNotExist())
                 .andExpect(cookie().value(COOKIE, "refresh-moi"))
                 .andExpect(cookie().httpOnly(COOKIE, true))
-                // Cookie sống đúng bằng TTL của refresh token
                 .andExpect(cookie().maxAge(COOKIE, 36000))
                 .andExpect(cookie().path(COOKIE, "/"))
                 .andReturn().getResponse();

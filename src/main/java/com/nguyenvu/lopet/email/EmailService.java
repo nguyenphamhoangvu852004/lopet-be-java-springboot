@@ -19,10 +19,6 @@ public class EmailService {
     private final ResendMailSender mailSender;
     private final OtpStore otpStore;
 
-    /**
-     * Còn OTP chưa hết hạn thì từ chối phát mã mới — đây là cơ chế chống spam gửi mail duy nhất của
-     * hệ thống. Lỗi trả về dùng message mặc định "BAD REQUEST" đúng như bản TS ({@code new BadRequest()}).
-     */
     public void sendOtp(String email) {
         if (otpStore.findOtp(email) != null) {
             throw new BadRequestException();
@@ -46,16 +42,10 @@ public class EmailService {
         otpStore.markVerified(email);
     }
 
-    /** 6 chữ số, cùng dải 100000–999999 với {@code generateOTP()} bên TS */
     private String generateOtp() {
         return String.valueOf(100_000 + RANDOM.nextInt(900_000));
     }
 
-    /**
-     * Giữ nguyên message "Send email failed" của bản TS để client không phải đổi, nhưng log nguyên
-     * nhân thật: lỗi hay gặp của Resend (401 sai khoá, 403 domain chưa verify) chỉ nằm trong message
-     * của exception, nuốt đi là mất luôn manh mối duy nhất.
-     */
     private void send(String email, String otp) {
         try {
             mailSender.sendHtml(email, "Mã xác thực OTP của bạn", body(otp));

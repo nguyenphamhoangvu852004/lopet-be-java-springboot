@@ -18,7 +18,9 @@ import com.nguyenvu.lopet.common.response.ApiResponse;
 import com.nguyenvu.lopet.comment.dto.CommentDtos;
 import com.nguyenvu.lopet.security.Auth;
 import com.nguyenvu.lopet.security.CurrentUser;
-import com.nguyenvu.lopet.security.RequirePermission;
+import com.nguyenvu.lopet.security.rebac.ObjectRef;
+import com.nguyenvu.lopet.security.rebac.RebacEngine;
+import com.nguyenvu.lopet.security.rebac.RebacModel;
 
 import lombok.RequiredArgsConstructor;
 
@@ -28,18 +30,18 @@ import lombok.RequiredArgsConstructor;
 public class CommentController {
 
     private final CommentService commentService;
-    private final CommentAccessGuard commentAccessGuard;
+    private final RebacEngine rebac;
     private final CloudinaryService cloudinaryService;
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
     @Auth
-    @RequirePermission("comment:create")
     public ApiResponse<CommentDtos.CreateCommentResponse> create(
             @RequestParam(required = false) String content,
             @RequestParam(required = false) String postId,
             @RequestParam(required = false) String replyCommentId,
             @RequestPart(name = "image", required = false) MultipartFile image) {
+        rebac.require(RebacModel.COMMENT_CREATE, ObjectRef.platform());
         String imageUrl = image == null || image.isEmpty() ? "" : cloudinaryService.uploadImage(image);
         return created(content, postId, replyCommentId, imageUrl);
     }
@@ -51,10 +53,6 @@ public class CommentController {
                         parseReplyId(replyCommentId), content, imageUrl));
     }
 
-    /**
-     * Đọc bình luận dùng xác thực mềm: khách vẫn xem được bình luận của bài công khai, còn bài riêng
-     * tư thì phải nhận diện được người xem mới lọc đúng.
-     */
     @GetMapping("/{postId}")
     @Auth(required = false)
     public ApiResponse<CommentDtos.GetCommentsResponse> getAllFromPost(@PathVariable Integer postId) {
@@ -64,17 +62,11 @@ public class CommentController {
 
     @DeleteMapping("/{commentId}")
     @Auth
-    @RequirePermission({"comment:delete:own", "post:delete"})
     public ApiResponse<CommentDtos.DeleteCommentResponse> delete(@PathVariable Integer commentId) {
-        commentAccessGuard.requireOwnerToDelete(commentId);
+        rebac.require(RebacModel.COMMENT_DELETE, ObjectRef.comment(commentId));
         return ApiResponse.ok("Deleted comment successfully", commentService.delete(commentId));
     }
 
-    /**
-     * {@code replyCommentId} rỗng/thiếu nghĩa là bình luận gốc. Bản TS dùng
-     * {@code replyCommentId ? Number(replyCommentId) : null} — chuỗi rác vẫn ra NaN và bị tầng dưới
-     * coi là falsy, nên ở đây giá trị không parse được cũng cho ra null thay vì ném lỗi.
-     */
     private Integer parseReplyId(String value) {
         if (value == null || value.isEmpty()) {
             return null;

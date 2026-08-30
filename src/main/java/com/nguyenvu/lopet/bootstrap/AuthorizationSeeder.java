@@ -18,14 +18,6 @@ import com.nguyenvu.lopet.security.authz.PermissionDef;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-/**
- * Đồng bộ ba bảng {@code permissions} / {@code roles} / {@code role_permission} theo đúng
- * {@link PermissionCatalog}. Idempotent nên gọi mỗi lần khởi động đều được — bản dịch của
- * {@code seedAuthorization()}.
- *
- * <p>Trước bản vá bên TS, phần seed role không được gọi ở đâu cả nên bảng {@code roles} luôn rỗng và
- * không tài khoản nào là ADMIN. Đó là lý do thứ tự khởi động (seed trước, mở cổng sau) là bắt buộc.
- */
 @Slf4j
 @Component
 @RequiredArgsConstructor

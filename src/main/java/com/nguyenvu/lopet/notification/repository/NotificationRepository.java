@@ -9,11 +9,6 @@ import org.springframework.data.repository.query.Param;
 
 import com.nguyenvu.lopet.notification.entity.Notification;
 
-/**
- * Entity {@code Notification} cố ý không gắn {@code @SQLRestriction}, vì {@link #findDetailById}
- * phải đọc được cả bản ghi đã xoá mềm (bản TS dùng {@code withDeleted: true}). Bộ lọc xoá mềm vì
- * vậy được viết tường minh ở truy vấn danh sách.
- */
 public interface NotificationRepository extends JpaRepository<Notification, Integer> {
 
     @Query("""

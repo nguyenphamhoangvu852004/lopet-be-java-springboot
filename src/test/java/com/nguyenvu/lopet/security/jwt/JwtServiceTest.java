@@ -10,16 +10,8 @@ import org.junit.jupiter.api.Test;
 
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * JwtService được tự hiện thực (không dùng jjwt/Nimbus) để chấp nhận được khoá ngắn của
- * {@code .env} hiện tại, nên phần mã hoá phải có test riêng — đây là chỗ dễ sai nhất.
- */
 class JwtServiceTest {
 
-    /**
-     * Đúng độ dài khoá đang chạy ở production: 23 byte, ngắn hơn mức RFC 7518 đòi cho HS256.
-     * Giá trị chỉ cần đúng độ dài — không lặp lại secret thật, thứ chỉ được sống trong {@code .env}.
-     */
     private static final String SHORT_SECRET = "test-access-secret-23by";
 
     private final JwtService jwtService = new JwtService(JsonMapper.builder().build(),
@@ -41,7 +33,6 @@ class JwtServiceTest {
         String token = jwtService.generateAccessToken(principal);
         String header = new String(Base64.getUrlDecoder().decode(token.split("\\.")[0]));
 
-        // jsonwebtoken sinh đúng chuỗi này; client nào tự kiểm header sẽ dựa vào nó
         assertThat(header).isEqualTo("{\"alg\":\"HS256\",\"typ\":\"JWT\"}");
     }
 
@@ -103,7 +94,6 @@ class JwtServiceTest {
 
     @Test
     void access_token_va_refresh_token_khong_dung_chung_khoa() {
-        // Refresh token ký bằng REFRESH_TOKEN_SECRET nên không được dùng thay access token
         assertThatThrownBy(() -> jwtService.parseAccessToken(jwtService.generateRefreshToken(principal)))
                 .isInstanceOf(JwtException.class)
                 .hasMessage(JwtException.INVALID_SIGNATURE);

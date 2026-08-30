@@ -23,14 +23,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/**
- * Bảng nối account ↔ role, khai báo tường minh (không dùng bảng nối ngầm) vì cần thêm cột audit:
- * ai cấp quyền và cấp lúc nào.
- *
- * <p>Cột {@code account_id}/{@code role_id} vừa là khoá chính vừa là FK, nên quan hệ
- * {@code @ManyToOne} tới chúng phải để {@code insertable=false, updatable=false} — giá trị được ghi
- * qua chính hai trường khoá.
- */
 @Getter
 @Setter
 @Builder
@@ -60,11 +52,6 @@ public class AccountRole extends BaseEntity {
     @OnDelete(action = OnDeleteAction.CASCADE)
     private Role role;
 
-    /**
-     * Staff đã cấp role này — lấy từ token của người thao tác, không nhận từ body.
-     * Giữ dạng quan hệ (không phải cột Integer trần) để FK {@code ON DELETE SET NULL} còn nguyên trong
-     * schema; gán bằng entity reference nên không tốn thêm truy vấn.
-     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "granted_by")
     @OnDelete(action = OnDeleteAction.SET_NULL)

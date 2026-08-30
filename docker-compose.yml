@@ -40,6 +40,8 @@ services:
       dockerfile: Dockerfile
     container_name: lopet-backend
     restart: always
+    ports:
+      - 8080:8080
     env_file:
       - .env.dev
     environment:
