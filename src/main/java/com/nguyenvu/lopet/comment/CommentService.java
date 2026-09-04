@@ -13,26 +13,18 @@ import com.nguyenvu.lopet.comment.dto.CommentDtos;
 import com.nguyenvu.lopet.comment.entity.Comment;
 import com.nguyenvu.lopet.comment.repository.CommentRepository;
 import com.nguyenvu.lopet.common.exception.BadRequestException;
-import com.nguyenvu.lopet.notification.NotificationPublisher;
+import com.nguyenvu.lopet.common.exception.ForbiddenException;
 import com.nguyenvu.lopet.post.entity.Post;
 import com.nguyenvu.lopet.post.repository.PostRepository;
 
 import lombok.RequiredArgsConstructor;
 
-/**
- * Bình luận thừa hưởng quyền riêng tư của BÀI VIẾT chứa nó — không có quyền riêng tư riêng.
- *
- * <p>Trước bản vá, luồng đọc bình luận nạp bài bằng hàm không lọc còn route thì không xác thực, nên
- * danh sách bình luận (kèm username/email người bình luận) của một bài PRIVATE vẫn đọc được bởi
- * khách vãng lai dù thân bài đã được che.
- */
 @Service
 @RequiredArgsConstructor
 public class CommentService {
 
     private final CommentRepository commentRepository;
     private final PostRepository postRepository;
-    private final NotificationPublisher notificationPublisher;
     private final AccountRepository accountRepository;
 
     @Transactional
@@ -41,17 +33,13 @@ public class CommentService {
         Account account = accountRepository.findById(accountId)
                 .orElseThrow(() -> new BadRequestException("No account found"));
 
-        // Không bình luận được vào bài mà mình không có quyền xem
-        Post post = postRepository.findVisibleById(postId, accountId)
+        Post post = postRepository.findDetailById(postId)
                 .orElseThrow(() -> new BadRequestException("No post found"));
 
         Comment parent = null;
         if (replyCommentId != null) {
             Comment candidate = commentRepository.findDetailById(replyCommentId)
                     .orElseThrow(() -> new BadRequestException("No comment found"));
-            // Bình luận cha PHẢI thuộc đúng bài vừa được kiểm quyền ở trên. Không đối chiếu thì chỉ
-            // cần ghép postId của một bài mình xem được với replyCommentId lấy từ bài PRIVATE của
-            // người khác là tạo được reply gắn vào cây bình luận đó — tức là kiểm nhầm tài nguyên.
             if (candidate.getPost() == null || !candidate.getPost().getId().equals(post.getId())) {
                 throw new BadRequestException("No comment found");
             }
@@ -66,18 +54,14 @@ public class CommentService {
                 .post(post)
                 .build());
 
-        notificationPublisher.postCommented(accountId, ownerAccountIdOf(post), post.getId());
-
         return new CommentDtos.CreateCommentResponse(saved.getId());
     }
 
     @Transactional(readOnly = true)
-    public CommentDtos.GetCommentsResponse getAllFromPost(Integer postId, Integer viewerId) {
-        Post post = postRepository.findVisibleById(postId, viewerId)
+    public CommentDtos.GetCommentsResponse getAllFromPost(Integer postId) {
+        Post post = postRepository.findDetailById(postId)
                 .orElseThrow(() -> new BadRequestException("No post found"));
 
-        // Bản TS gọi profileRepo theo TỪNG bình luận (N+1). Hồ sơ nay nằm trong đồ thị nạp của
-        // findAllByPostId, nên không còn truy vấn phụ nào — response không đổi.
         List<CommentDtos.CommentItem> items = commentRepository.findAllByPostId(post.getId()).stream()
                 .map(this::toItem)
                 .toList();
@@ -85,15 +69,16 @@ public class CommentService {
         return new CommentDtos.GetCommentsResponse(post.getId(), items);
     }
 
-    /**
-     * Quyền sở hữu đã được kiểm ở tầng guard trước khi vào đây và cố ý KHÔNG lặp lại: guard cho
-     * staff (quyền {@code post:delete}) bỏ qua ownership để kiểm duyệt, còn kiểm tra tại service lại
-     * chặn đúng nhóm đó.
-     */
     @Transactional
-    public CommentDtos.DeleteCommentResponse delete(Integer commentId) {
+    public CommentDtos.DeleteCommentResponse delete(Integer commentId, Integer callerId) {
         Comment comment = commentRepository.findDetailById(commentId)
                 .orElseThrow(() -> new BadRequestException("No comment found"));
+
+        // Only the comment author or the post owner may delete — replaces the removed ReBAC rule.
+        if (!callerId.equals(authorIdOf(comment)) && !callerId.equals(ownerAccountIdOf(comment.getPost()))) {
+            throw new ForbiddenException("You are not allowed to delete this comment");
+        }
+
         commentRepository.delete(comment);
         return new CommentDtos.DeleteCommentResponse(comment.getId());
     }
@@ -123,9 +108,12 @@ public class CommentService {
                 comment.getText(), comment.getImages(), comment.getCreatedAt());
     }
 
-    /** Tác giả bài — người nhận thông báo */
     private Integer ownerAccountIdOf(Post post) {
-        return post.getAccount() == null ? null : post.getAccount().getId();
+        return post == null || post.getAccount() == null ? null : post.getAccount().getId();
+    }
+
+    private Integer authorIdOf(Comment comment) {
+        return comment.getAccount() == null ? null : comment.getAccount().getId();
     }
 
     private String orEmpty(String value) {

@@ -42,11 +42,9 @@ public class Comment extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    /** Tên cột là {@code text} đúng như bên TS, dù trường DTO tương ứng lại tên là {@code content} */
     @Column(name = "text", nullable = false, columnDefinition = "text")
     private String text;
 
-    /** Xoá bình luận cha kéo theo toàn bộ bình luận con (FK CASCADE) */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parentId")
     @OnDelete(action = OnDeleteAction.CASCADE)

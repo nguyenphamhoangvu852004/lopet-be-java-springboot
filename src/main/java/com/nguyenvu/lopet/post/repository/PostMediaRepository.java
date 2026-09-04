@@ -13,11 +13,6 @@ public interface PostMediaRepository extends JpaRepository<PostMedia, Integer> {
 
     List<PostMedia> findByPostId(Integer postId);
 
-    /**
-     * Hai biến thể tương ứng đúng hai nhánh của {@code deleteNotIn()} bên TS: mệnh đề
-     * {@code NOT IN} chỉ được thêm khi danh sách giữ lại không rỗng, còn danh sách rỗng nghĩa là
-     * xoá sạch media của bài.
-     */
     @Modifying
     @Query("delete from PostMedia m where m.post.id = :postId")
     void deleteAllByPostId(@Param("postId") Integer postId);

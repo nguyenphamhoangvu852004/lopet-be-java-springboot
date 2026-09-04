@@ -1,9 +1,5 @@
 package com.nguyenvu.lopet.common.response;
 
-/**
- * Bản sao của {@code src/global/httpStatusCode.ts}. Các chuỗi này đi thẳng ra body response nên
- * phải giữ nguyên văn, kể cả khoảng trắng ("NOT FOUND" chứ không phải "NOT_FOUND").
- */
 public final class HttpStatusMessage {
 
     public static final String OK = "OK";
@@ -15,6 +11,7 @@ public final class HttpStatusMessage {
     public static final String NOT_FOUND = "NOT FOUND";
     public static final String CONFLICT = "CONFLICT";
     public static final String INTERNAL_SERVER_ERROR = "INTERNAL SERVER ERROR";
+    public static final String SERVICE_UNAVAILABLE = "SERVICE UNAVAILABLE";
 
     private HttpStatusMessage() {
     }

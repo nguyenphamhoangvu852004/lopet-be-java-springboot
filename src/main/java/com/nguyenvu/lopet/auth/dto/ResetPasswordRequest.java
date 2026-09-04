@@ -5,10 +5,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
-/**
- * {@code email} bị ghép thẳng vào khoá Redis {@code email_verified:<email>} và dùng để tra tài
- * khoản, nên không nhận chuỗi tuỳ ý — ràng buộc {@code @Email} ở đây là bắt buộc chứ không phải cho đẹp.
- */
 public record ResetPasswordRequest(
 
         @NotNull(message = "\"email\" is required")
