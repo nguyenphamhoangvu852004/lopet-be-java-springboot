@@ -1,5 +1,6 @@
 package com.nguyenvu.lopet.comment.repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -11,10 +12,6 @@ import com.nguyenvu.lopet.comment.entity.Comment;
 
 public interface CommentRepository extends JpaRepository<Comment, Integer> {
 
-    /**
-     * Nạp kèm {@code account.accountProfile}: mọi bình luận hiển thị hồ sơ của tác giả, nên để hồ sơ
-     * lazy là quay lại đúng N+1 mà bản TS mắc phải.
-     */
     @Query("""
             select distinct c from Comment c
             left join fetch c.account ap
@@ -25,10 +22,6 @@ public interface CommentRepository extends JpaRepository<Comment, Integer> {
             """)
     List<Comment> findAllByPostId(@Param("postId") Integer postId);
 
-    /**
-     * Nạp kèm {@code post}: tầng service phải đối chiếu bình luận cha thuộc đúng bài nào trước khi
-     * cho trả lời, và quyền xem luôn được quyết theo BÀI chứ không theo bản thân bình luận.
-     */
     @Query("""
             select c from Comment c
             left join fetch c.account ap
@@ -37,4 +30,9 @@ public interface CommentRepository extends JpaRepository<Comment, Integer> {
             where c.id = :id
             """)
     Optional<Comment> findDetailById(@Param("id") Integer id);
+
+    long countByDeletedAtIsNull();
+
+    long countByCreatedAtGreaterThanEqual(LocalDateTime since);
+
 }

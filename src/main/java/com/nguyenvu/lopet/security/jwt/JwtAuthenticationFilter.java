@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.util.List;
 
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -19,13 +18,6 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-    public static final String ATTRIBUTE_STATE = "lopet.jwt.state";
-    public static final String ATTRIBUTE_ERROR = "lopet.jwt.error";
-
-    public enum TokenState {
-        ABSENT, INVALID, VALID
-    }
-
     private final JwtService jwtService;
 
     @Override
@@ -33,23 +25,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         String token = extractToken(request);
 
-        if (token == null) {
-            request.setAttribute(ATTRIBUTE_STATE, TokenState.ABSENT);
-            chain.doFilter(request, response);
-            return;
-        }
-
-        try {
-            UserPrincipal principal = jwtService.parseAccessToken(token);
-            List<SimpleGrantedAuthority> authorities = principal.roles().stream()
-                    .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
-                    .toList();
-            SecurityContextHolder.getContext().setAuthentication(
-                    new UsernamePasswordAuthenticationToken(principal, null, authorities));
-            request.setAttribute(ATTRIBUTE_STATE, TokenState.VALID);
-        } catch (JwtException exception) {
-            request.setAttribute(ATTRIBUTE_STATE, TokenState.INVALID);
-            request.setAttribute(ATTRIBUTE_ERROR, exception);
+        if (token != null) {
+            try {
+                UserPrincipal principal = jwtService.parseAccessToken(token);
+                SecurityContextHolder.getContext().setAuthentication(
+                        new UsernamePasswordAuthenticationToken(principal, null, List.of()));
+            } catch (JwtException ignored) {
+                // A missing or broken token simply means "not signed in";
+                // endpoints annotated with @Auth answer 401 on their own.
+            }
         }
 
         try {

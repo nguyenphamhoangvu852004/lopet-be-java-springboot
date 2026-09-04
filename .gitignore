@@ -38,3 +38,4 @@ build/
 /docs/*.md
 
 /scripts/*
+/.metadata/

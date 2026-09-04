@@ -17,7 +17,7 @@ import org.springframework.context.annotation.Configuration;
         type = SecuritySchemeType.HTTP,
         scheme = "bearer",
         bearerFormat = "JWT",
-        description = "Dán access token thuần (không cần gõ chữ 'Bearer ')"
+        description = "Paste the raw access token (no need to type the word 'Bearer')"
 )
 public class OpenAPIConfig {
 }

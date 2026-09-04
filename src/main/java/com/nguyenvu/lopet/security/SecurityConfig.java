@@ -13,12 +13,6 @@ import com.nguyenvu.lopet.security.jwt.JwtAuthenticationFilter;
 
 import lombok.RequiredArgsConstructor;
 
-/**
- * Chuỗi filter cố ý để {@code permitAll}: mọi quyết định phân quyền nằm ở bốn tầng đã có
- * ({@link Auth}, {@link RequirePermission}, ownership, capability) để trùng đúng một nguồn sự thật
- * với backend TypeScript. Dùng thêm {@code authorizeHttpRequests} theo pattern URL sẽ tạo ra tầng
- * thứ năm, và mỗi lần thêm route lại có nguy cơ hai tầng nói khác nhau.
- */
 @Configuration
 @RequiredArgsConstructor
 public class SecurityConfig {
@@ -38,10 +32,6 @@ public class SecurityConfig {
                 .build();
     }
 
-    /**
-     * bcrypt cost 10 — trùng {@code bcryptConfig.saltRounds} của lopet-be, và cùng định dạng
-     * {@code $2a$} nên hash cũ trong DB vẫn kiểm được, người dùng không phải đặt lại mật khẩu.
-     */
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder(10);

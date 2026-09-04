@@ -18,7 +18,6 @@ import com.nguyenvu.lopet.common.response.ApiResponse;
 import com.nguyenvu.lopet.comment.dto.CommentDtos;
 import com.nguyenvu.lopet.security.Auth;
 import com.nguyenvu.lopet.security.CurrentUser;
-import com.nguyenvu.lopet.security.RequirePermission;
 
 import lombok.RequiredArgsConstructor;
 
@@ -28,13 +27,11 @@ import lombok.RequiredArgsConstructor;
 public class CommentController {
 
     private final CommentService commentService;
-    private final CommentAccessGuard commentAccessGuard;
     private final CloudinaryService cloudinaryService;
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
     @Auth
-    @RequirePermission("comment:create")
     public ApiResponse<CommentDtos.CreateCommentResponse> create(
             @RequestParam(required = false) String content,
             @RequestParam(required = false) String postId,
@@ -51,30 +48,18 @@ public class CommentController {
                         parseReplyId(replyCommentId), content, imageUrl));
     }
 
-    /**
-     * Đọc bình luận dùng xác thực mềm: khách vẫn xem được bình luận của bài công khai, còn bài riêng
-     * tư thì phải nhận diện được người xem mới lọc đúng.
-     */
     @GetMapping("/{postId}")
-    @Auth(required = false)
     public ApiResponse<CommentDtos.GetCommentsResponse> getAllFromPost(@PathVariable Integer postId) {
-        return ApiResponse.ok("Get comment successfully",
-                commentService.getAllFromPost(postId, CurrentUser.viewerId()));
+        return ApiResponse.ok("Get comment successfully", commentService.getAllFromPost(postId));
     }
 
     @DeleteMapping("/{commentId}")
     @Auth
-    @RequirePermission({"comment:delete:own", "post:delete"})
     public ApiResponse<CommentDtos.DeleteCommentResponse> delete(@PathVariable Integer commentId) {
-        commentAccessGuard.requireOwnerToDelete(commentId);
-        return ApiResponse.ok("Deleted comment successfully", commentService.delete(commentId));
+        return ApiResponse.ok("Deleted comment successfully",
+                commentService.delete(commentId, CurrentUser.require().id()));
     }
 
-    /**
-     * {@code replyCommentId} rỗng/thiếu nghĩa là bình luận gốc. Bản TS dùng
-     * {@code replyCommentId ? Number(replyCommentId) : null} — chuỗi rác vẫn ra NaN và bị tầng dưới
-     * coi là falsy, nên ở đây giá trị không parse được cũng cho ra null thay vì ném lỗi.
-     */
     private Integer parseReplyId(String value) {
         if (value == null || value.isEmpty()) {
             return null;

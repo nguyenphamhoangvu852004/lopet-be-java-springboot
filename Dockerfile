@@ -1,4 +1,3 @@
-# ---------- Stage 1: build ----------
 FROM eclipse-temurin:21-jdk-jammy AS build
 
 WORKDIR /app
@@ -11,7 +10,6 @@ RUN ./mvnw dependency:go-offline -B
 COPY src ./src
 RUN ./mvnw package -DskipTests -B
 
-# ---------- Stage 2: runtime ----------
 FROM eclipse-temurin:21-jre-jammy
 
 WORKDIR /app

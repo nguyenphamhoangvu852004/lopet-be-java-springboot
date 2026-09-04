@@ -8,16 +8,8 @@ import com.nguyenvu.lopet.post.entity.Post;
 import com.nguyenvu.lopet.post.entity.PostLike;
 import com.nguyenvu.lopet.post.entity.PostMedia;
 
-/** Chỉ được gọi bên trong transaction: các collection của Post đều lazy. */
 public final class PostMapper {
 
-    /**
-     * {@code null} khi bài không quy được về tài khoản nào — cột {@code posts.account_id} là
-     * NULLABLE và dữ liệu cũ có thể còn hàng rỗng.
-     *
-     * <p>KHÔNG ném ở đây: mapper chạy trên đường ĐỌC, và một hàng dữ liệu cũ không được phép
-     * làm hỏng cả trang feed. Tầng trên nhận null và tự quyết cách hiển thị tác giả.
-     */
     private static Integer accountIdOf(Post post) {
         return post.getAccount() == null ? null : post.getAccount().getId();
     }
@@ -27,8 +19,6 @@ public final class PostMapper {
                 post.getId(),
                 accountIdOf(post),
                 post.getContent(),
-                post.getGroup() == null ? null : post.getGroup().getId(),
-                post.getPostType(),
                 mediasWithId(post),
                 post.getPostLikes().size(),
                 likedAccounts(post),
@@ -41,8 +31,6 @@ public final class PostMapper {
                 post.getId(),
                 accountIdOf(post),
                 post.getContent(),
-                post.getGroup() == null ? null : post.getGroup().getId(),
-                post.getPostType(),
                 mediasWithoutId(post),
                 post.getPostLikes().size(),
                 post.getCreatedAt(),
@@ -54,8 +42,6 @@ public final class PostMapper {
                 post.getId(),
                 accountIdOf(post),
                 post.getContent(),
-                post.getGroup() == null ? null : post.getGroup().getId(),
-                post.getPostType(),
                 mediasWithId(post),
                 post.getPostLikes().size(),
                 likedAccounts(post),
@@ -67,8 +53,6 @@ public final class PostMapper {
         return new PostDtos.PostByAccountItem(
                 post.getId(),
                 post.getContent(),
-                post.getGroup() == null ? null : post.getGroup().getId(),
-                post.getPostType(),
                 mediasWithoutId(post),
                 post.getPostLikes().size(),
                 post.getCreatedAt(),
@@ -91,16 +75,10 @@ public final class PostMapper {
                 .toList();
     }
 
-    /** Set của Hibernate không giữ thứ tự — sắp theo id để danh sách media ổn định */
     private static java.util.stream.Stream<PostMedia> sortedMedias(Post post) {
         return post.getPostMedias().stream().sorted(Comparator.comparing(PostMedia::getId));
     }
 
-    /**
-     * Lượt thích mất tài khoản bị BỎ QUA thay vì trả về một phần tử rỗng: danh sách này chỉ
-     * dùng để hiện ai đã thích, và một dòng không có danh tính thì không hiện được gì.
-     * {@code likeAmount} vẫn đếm đủ vì nó lấy từ {@code postLikes.size()}.
-     */
     private static List<PostDtos.LikedAccount> likedAccounts(Post post) {
         return post.getPostLikes().stream()
                 .sorted(Comparator.comparing(PostLike::getId))

@@ -19,13 +19,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/**
- * KHÔNG kế thừa {@code BaseEntity} của dự án — entity bên TS extends BaseEntity của chính TypeORM,
- * nên bảng {@code post_likes} chỉ có ba cột và không có soft delete.
- *
- * <p>Cũng KHÔNG có UNIQUE(post_id, account_id): tính duy nhất chỉ được bảo đảm ở tầng service.
- * Thêm ràng buộc ở đây sẽ đổi hành vi like trùng từ "200 kèm message" thành lỗi ràng buộc.
- */
 @Getter
 @Setter
 @Builder

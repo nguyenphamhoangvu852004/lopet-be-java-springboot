@@ -1,23 +1,11 @@
 package com.nguyenvu.lopet.email;
 
-import java.time.Duration;
-
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
-import lombok.RequiredArgsConstructor;
+import java.time.Duration;
 
-/**
- * Hai khoá Redis mà cả luồng đăng ký lẫn luồng đổi mật khẩu đều dựa vào:
- *
- * <ul>
- *   <li>{@code otp:<email>} — mã OTP, TTL 120 giây</li>
- *   <li>{@code email_verified:<email>} — bằng chứng người gọi kiểm soát hòm thư, TTL 300 giây</li>
- * </ul>
- *
- * Tên khoá và TTL là một phần hợp đồng giữa hai luồng, không phải chi tiết nội bộ — đổi ở đây là
- * phá luồng kia.
- */
 @Component
 @RequiredArgsConstructor
 public class OtpStore {
@@ -59,11 +47,6 @@ public class OtpStore {
         redis.delete(verifiedKey(email));
     }
 
-    /**
-     * Đọc và tiêu thụ cờ trong MỘT lệnh nguyên tử (GETDEL). Tách làm get + del sẽ để hở cửa sổ cho
-     * hai request đổi mật khẩu chạy song song cùng đọc thấy cờ và cùng đi tiếp — một lần xác thực
-     * OTP mở ra nhiều lần đổi mật khẩu.
-     */
     public String consumeVerifiedFlag(String email) {
         return redis.opsForValue().getAndDelete(verifiedKey(email));
     }

@@ -35,12 +35,6 @@ public class AuthController {
     private final AuthService authService;
     private final RefreshTokenCookie refreshTokenCookie;
 
-    /**
-     * Refresh token ra bằng cookie {@code HttpOnly} chứ không nằm trong body: body đi qua tay
-     * JavaScript của client (và thường dừng lại ở {@code localStorage}), nên một lỗ XSS ở đó là mất
-     * luôn khả năng gia hạn phiên. Access token vẫn trả trong body vì client phải tự gắn nó vào
-     * header {@code Authorization} cho mọi request.
-     */
     @Operation(summary = "Login", description = "API allow user login into system. Refresh token is returned as an HttpOnly cookie, not in the response body")
     @PostMapping("/v1/auth/login")
     public ApiResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request,
@@ -50,10 +44,6 @@ public class AuthController {
         return ApiResponse.ok(HttpStatusMessage.OK, new LoginResponse(tokens.id(), tokens.accessToken()));
     }
 
-    /**
-     * Không nhận body: refresh token chỉ đến từ cookie, vì đó là bản duy nhất client còn giữ sau khi
-     * đăng nhập. Endpoint tự ghi đè cookie bằng token vừa xoay vòng.
-     */
     @Operation(summary = "Get new Access Token", description = "API used to create a new access token by using the refresh token cookie")
     @PostMapping("/v1/auth/refresh")
     public ApiResponse<RefreshTokenResponse> refresh(HttpServletRequest request,
