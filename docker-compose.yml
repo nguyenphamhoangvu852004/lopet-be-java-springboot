@@ -17,6 +17,8 @@ services:
       MYSQL_DATABASE: ${DATABASE_NAME}
     volumes:
       - lopet-mysql-data:/var/lib/mysql
+    ports:
+      - "${DATABASE_PORT:-3307}:3306"
     mem_limit: 600m
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DATABASE_PASSWORD}"]
@@ -30,6 +32,8 @@ services:
     image: redis:8.0
     container_name: lopet-redis
     restart: always
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
     mem_limit: 100m
     networks:
       - lopet-network
@@ -43,9 +47,13 @@ services:
     env_file:
       - .env.dev
     environment:
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE}   # lấy từ .env, không hardcode
-    expose:
-      - "8080"
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE}
+      DATABASE_HOSTNAME: lopet-mysql
+      DATABASE_PORT: 3306
+      REDIS_HOSTNAME: lopet-redis
+      REDIS_PORT: 6379
+    ports:
+      - "${APP_PORT:-8080}:8080"
     depends_on:
       lopet-mysql:
         condition: service_healthy
