@@ -28,7 +28,7 @@ public class CloudinaryService {
             Map<?, ?> result = cloudinary.uploader().upload(file.getBytes(), options);
             return (String) result.get("secure_url");
         } catch (IOException exception) {
-            throw new BadRequestException("Upload thất bại: " + exception.getMessage());
+            throw new BadRequestException("Upload failed: " + exception.getMessage());
         }
     }
 

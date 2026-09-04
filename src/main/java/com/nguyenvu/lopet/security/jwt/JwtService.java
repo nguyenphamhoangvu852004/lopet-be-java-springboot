@@ -3,10 +3,8 @@ package com.nguyenvu.lopet.security.jwt;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Base64;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 import javax.crypto.Mac;
@@ -66,7 +64,6 @@ public class JwtService {
         Map<String, Object> claims = new LinkedHashMap<>();
         claims.put("id", payload.id());
         claims.put("email", payload.email());
-        claims.put("roles", payload.roles());
         claims.put("iat", issuedAt);
         claims.put("exp", issuedAt + ttlSeconds);
 
@@ -108,14 +105,14 @@ public class JwtService {
             throw new JwtException(JwtException.EXPIRED, true);
         }
 
-        return new UserPrincipal(toAccountId(claims.get("id")), asString(claims.get("email")), toRoles(claims.get("roles")));
+        return new UserPrincipal(toAccountId(claims.get("id")), asString(claims.get("email")));
     }
 
     private byte[] writeJson(Map<String, Object> claims) {
         try {
             return objectMapper.writeValueAsBytes(claims);
         } catch (Exception exception) {
-            throw new IllegalStateException("Không serialize được payload JWT", exception);
+            throw new IllegalStateException("Unable to serialize the JWT payload", exception);
         }
     }
 
@@ -125,7 +122,7 @@ public class JwtService {
             mac.init(new SecretKeySpec(secret, HMAC_SHA256));
             return mac.doFinal(signingInput.getBytes(StandardCharsets.UTF_8));
         } catch (Exception exception) {
-            throw new IllegalStateException("Không ký được JWT", exception);
+            throw new IllegalStateException("Unable to sign the JWT", exception);
         }
     }
 
@@ -137,16 +134,4 @@ public class JwtService {
         return value instanceof String text ? text : null;
     }
 
-    private static List<String> toRoles(Object value) {
-        if (!(value instanceof List<?> raw)) {
-            return List.of();
-        }
-        List<String> roles = new ArrayList<>(raw.size());
-        for (Object item : raw) {
-            if (item instanceof String role) {
-                roles.add(role);
-            }
-        }
-        return roles;
-    }
 }

@@ -18,7 +18,6 @@ import com.nguyenvu.lopet.account.repository.AccountRepository;
 import com.nguyenvu.lopet.common.exception.BadRequestException;
 import com.nguyenvu.lopet.common.exception.ForbiddenException;
 import com.nguyenvu.lopet.common.exception.NotFoundException;
-import com.nguyenvu.lopet.notification.NotificationPublisher;
 import com.nguyenvu.lopet.post.dto.PostDtos;
 import com.nguyenvu.lopet.post.entity.MediaType;
 import com.nguyenvu.lopet.post.entity.Post;
@@ -39,13 +38,11 @@ public class PostService {
     private final PostRepository postRepository;
     private final PostMediaRepository postMediaRepository;
     private final PostLikeRepository postLikeRepository;
-    private final NotificationPublisher notificationPublisher;
     private final AccountRepository accountRepository;
-    private final PostPolicy postPolicy;
 
     @Transactional(readOnly = true)
-    public List<PostDtos.PostSuggestItem> getSuggestList(Integer viewerId) {
-        List<Integer> ids = postRepository.findVisibleIds(viewerId, null, PageRequest.of(0, SUGGEST_SIZE));
+    public List<PostDtos.PostSuggestItem> getSuggestList() {
+        List<Integer> ids = postRepository.findIdsMatching(null, PageRequest.of(0, SUGGEST_SIZE));
         if (ids.isEmpty()) {
             return List.of();
         }
@@ -70,16 +67,16 @@ public class PostService {
     }
 
     @Transactional(readOnly = true)
-    public OffsetPage<PostDtos.PostListItem> getAll(String content, Integer viewerId, int page, int limit) {
+    public OffsetPage<PostDtos.PostListItem> getAll(String content, int page, int limit) {
         if (page < 1) {
-            throw new BadRequestException("page phải lớn hơn hoặc bằng 1");
+            throw new BadRequestException("page must be greater than or equal to 1");
         }
         if (limit < 1 || limit > MAX_PAGE_SIZE) {
-            throw new BadRequestException("limit phải nằm trong khoảng 1.." + MAX_PAGE_SIZE);
+            throw new BadRequestException("limit must be between 1 and " + MAX_PAGE_SIZE);
         }
 
-        long totalItems = postRepository.countVisible(viewerId, content);
-        List<Integer> ids = postRepository.findVisibleIds(viewerId, content, PageRequest.of(page - 1, limit));
+        long totalItems = postRepository.countMatching(content);
+        List<Integer> ids = postRepository.findIdsMatching(content, PageRequest.of(page - 1, limit));
         if (ids.isEmpty()) {
             return OffsetPage.of(List.of(), page, limit, totalItems);
         }
@@ -91,30 +88,27 @@ public class PostService {
     }
 
     @Transactional(readOnly = true)
-    public PostDtos.PostDetail getOneById(Integer id, Integer viewerId) {
-        Post post = postRepository.findVisibleById(id, viewerId).orElseThrow(NotFoundException::new);
+    public PostDtos.PostDetail getOneById(Integer id) {
+        Post post = postRepository.findDetailById(id).orElseThrow(NotFoundException::new);
         return PostMapper.toDetail(post);
     }
 
     @Transactional(readOnly = true)
-    public List<PostDtos.PostByAccountItem> getByAccountId(Integer accountId, Integer viewerId) {
-        return postRepository.findVisibleByAuthor(accountId, viewerId).stream()
+    public List<PostDtos.PostByAccountItem> getByAccountId(Integer accountId) {
+        return postRepository.findByAuthor(accountId).stream()
                 .map(PostMapper::toByAccountItem)
                 .toList();
     }
 
     @Transactional
-    public PostDtos.CreatePostResponse create(Integer accountId, String content, String scope,
+    public PostDtos.CreatePostResponse create(Integer accountId, String content,
                                                List<UploadedMedia> medias) {
         Account account = accountRepository.findById(accountId).orElseThrow(BadRequestException::new);
 
-        Post post = Post.builder()
+        Post saved = postRepository.save(Post.builder()
                 .account(account)
                 .content(content)
-                .build();
-        post.setPostScope(postPolicy.parseScope(scope));
-
-        Post saved = postRepository.save(post);
+                .build());
 
         List<PostDtos.MediaWithId> savedMedias = new ArrayList<>();
         for (UploadedMedia media : medias) {
@@ -128,13 +122,13 @@ public class PostService {
 
         LocalDateTime now = LocalDateTime.now();
         return new PostDtos.CreatePostResponse(saved.getAccount().getId(), saved.getId(),
-                saved.getContent(), saved.getPostScope(), savedMedias, now, now);
+                saved.getContent(), savedMedias, now, now);
     }
 
     @Transactional
-    public PostDtos.UpdatePostResponse update(Integer postId, Integer callerId, String content, String scope,
+    public PostDtos.UpdatePostResponse update(Integer postId, Integer callerId, String content,
                                                List<Integer> keepMediaIds, List<UploadedMedia> newMedias) {
-        Post post = postRepository.findByIdInternal(postId)
+        Post post = postRepository.findDetailById(postId)
                 .orElseThrow(() -> new BadRequestException("Post not found"));
 
         if (!callerId.equals(ownerAccountIdOf(post))) {
@@ -142,7 +136,6 @@ public class PostService {
         }
 
         post.setContent(content);
-        post.setPostScope(postPolicy.parseScope(scope));
 
         Post updated = postRepository.save(post);
 
@@ -178,20 +171,25 @@ public class PostService {
         }
 
         return new PostDtos.UpdatePostResponse(ownerAccountIdOf(updated), updated.getId(),
-                updated.getContent(), updated.getPostScope(), result,
+                updated.getContent(), result,
                 updated.getCreatedAt(), LocalDateTime.now());
     }
 
     @Transactional
-    public PostDtos.DeletePostResponse delete(Integer postId) {
+    public PostDtos.DeletePostResponse delete(Integer postId, Integer callerId) {
         Post post = postRepository.findById(postId).orElseThrow(BadRequestException::new);
+
+        if (!callerId.equals(ownerAccountIdOf(post))) {
+            throw new ForbiddenException("You are not the owner of this post");
+        }
+
         postRepository.delete(post);
         return new PostDtos.DeletePostResponse(postId);
     }
 
     @Transactional
     public PostDtos.ReactResponse like(Integer postId, Integer accountId) {
-        Post post = postRepository.findVisibleById(postId, accountId).orElseThrow(BadRequestException::new);
+        Post post = postRepository.findDetailById(postId).orElseThrow(BadRequestException::new);
         Account account = accountRepository.findById(accountId).orElseThrow(BadRequestException::new);
 
         if (postLikeRepository.findByAccountAndPost(account.getId(), post.getId()).isPresent()) {
@@ -200,14 +198,12 @@ public class PostService {
 
         postLikeRepository.save(PostLike.builder().post(post).account(account).build());
 
-        notificationPublisher.postLiked(accountId, ownerAccountIdOf(post), post.getId());
-
         return new PostDtos.ReactResponse("Like post successfully");
     }
 
     @Transactional
     public PostDtos.ReactResponse unlike(Integer postId, Integer accountId) {
-        Post post = postRepository.findVisibleById(postId, accountId).orElseThrow(BadRequestException::new);
+        Post post = postRepository.findDetailById(postId).orElseThrow(BadRequestException::new);
         Account account = accountRepository.findById(accountId).orElseThrow(BadRequestException::new);
 
         PostLike existing = postLikeRepository.findByAccountAndPost(account.getId(), post.getId())

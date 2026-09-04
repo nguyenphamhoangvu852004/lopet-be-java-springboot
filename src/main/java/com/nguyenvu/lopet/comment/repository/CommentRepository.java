@@ -1,5 +1,6 @@
 package com.nguyenvu.lopet.comment.repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -29,4 +30,9 @@ public interface CommentRepository extends JpaRepository<Comment, Integer> {
             where c.id = :id
             """)
     Optional<Comment> findDetailById(@Param("id") Integer id);
+
+    long countByDeletedAtIsNull();
+
+    long countByCreatedAtGreaterThanEqual(LocalDateTime since);
+
 }

@@ -13,8 +13,12 @@ public interface AccountProfileRepository extends JpaRepository<AccountProfile, 
     @Query("select p from AccountProfile p where p.account.id = :accountId")
     Optional<AccountProfile> findByAccountId(@Param("accountId") Integer accountId);
 
-    @Query("select p from AccountProfile p left join p.account a "
-            + " where a.id = :accountId and " + AccountProfileVisibilityFilter.VISIBLE_TO)
-    Optional<AccountProfile> findVisibleByAccountId(@Param("accountId") Integer accountId,
-                                                    @Param("viewerId") Integer viewerId);
+    /**
+     * Bản nạp kèm tài khoản, dùng cho hồ sơ của NGƯỜI KHÁC.
+     *
+     * Không còn lọc theo người xem: hồ sơ nào cũng đọc được. Vẫn tách khỏi
+     * {@link #findByAccountId} vì chỗ gọi cần `p.account` đã nạp sẵn.
+     */
+    @Query("select p from AccountProfile p left join fetch p.account a where a.id = :accountId")
+    Optional<AccountProfile> findWithAccountByAccountId(@Param("accountId") Integer accountId);
 }

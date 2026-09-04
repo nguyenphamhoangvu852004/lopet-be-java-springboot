@@ -18,9 +18,6 @@ import com.nguyenvu.lopet.common.response.ApiResponse;
 import com.nguyenvu.lopet.comment.dto.CommentDtos;
 import com.nguyenvu.lopet.security.Auth;
 import com.nguyenvu.lopet.security.CurrentUser;
-import com.nguyenvu.lopet.security.rebac.ObjectRef;
-import com.nguyenvu.lopet.security.rebac.RebacEngine;
-import com.nguyenvu.lopet.security.rebac.RebacModel;
 
 import lombok.RequiredArgsConstructor;
 
@@ -30,7 +27,6 @@ import lombok.RequiredArgsConstructor;
 public class CommentController {
 
     private final CommentService commentService;
-    private final RebacEngine rebac;
     private final CloudinaryService cloudinaryService;
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -41,7 +37,6 @@ public class CommentController {
             @RequestParam(required = false) String postId,
             @RequestParam(required = false) String replyCommentId,
             @RequestPart(name = "image", required = false) MultipartFile image) {
-        rebac.require(RebacModel.COMMENT_CREATE, ObjectRef.platform());
         String imageUrl = image == null || image.isEmpty() ? "" : cloudinaryService.uploadImage(image);
         return created(content, postId, replyCommentId, imageUrl);
     }
@@ -54,17 +49,15 @@ public class CommentController {
     }
 
     @GetMapping("/{postId}")
-    @Auth(required = false)
     public ApiResponse<CommentDtos.GetCommentsResponse> getAllFromPost(@PathVariable Integer postId) {
-        return ApiResponse.ok("Get comment successfully",
-                commentService.getAllFromPost(postId, CurrentUser.viewerId()));
+        return ApiResponse.ok("Get comment successfully", commentService.getAllFromPost(postId));
     }
 
     @DeleteMapping("/{commentId}")
     @Auth
     public ApiResponse<CommentDtos.DeleteCommentResponse> delete(@PathVariable Integer commentId) {
-        rebac.require(RebacModel.COMMENT_DELETE, ObjectRef.comment(commentId));
-        return ApiResponse.ok("Deleted comment successfully", commentService.delete(commentId));
+        return ApiResponse.ok("Deleted comment successfully",
+                commentService.delete(commentId, CurrentUser.require().id()));
     }
 
     private Integer parseReplyId(String value) {

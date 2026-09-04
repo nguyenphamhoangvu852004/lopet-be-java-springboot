@@ -12,7 +12,6 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class StartupRunner implements ApplicationRunner {
 
-    private final AuthorizationSeeder authorizationSeeder;
     private final AdminInitializer adminInitializer;
     private final SeedDemoAccount seedDemoAccount;
     private final SeedDemoPosts seedDemoPosts;
@@ -22,14 +21,13 @@ public class StartupRunner implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        authorizationSeeder.execute();
         adminInitializer.execute();
 
         if (!seedDemo) {
-            log.info("Bỏ qua dữ liệu demo (lopet.bootstrap.seed-demo=false)");
+            log.info("Skipping demo data (lopet.bootstrap.seed-demo=false)");
             return;
         }
-        log.info("Seed dữ liệu demo (lopet.bootstrap.seed-demo=true)");
+        log.info("Seeding demo data (lopet.bootstrap.seed-demo=true)");
         seedDemoAccount.execute();
         seedDemoPosts.execute();
     }

@@ -4,7 +4,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import com.nguyenvu.lopet.account.dto.AccountViews.AccountBrief;
-import com.nguyenvu.lopet.accountprofile.entity.ProfileVisibility;
 
 public final class AccountProfileDtos {
 
@@ -17,8 +16,7 @@ public final class AccountProfileDtos {
             String coverUrl,
             LocalDate dateOfBirth,
             String hometown,
-            Integer sex,
-            ProfileVisibility visibility) {
+            Integer sex) {
     }
 
     public record PublicProfile(
@@ -44,7 +42,6 @@ public final class AccountProfileDtos {
             String hometown,
             String avatarUrl,
             String coverUrl,
-            ProfileVisibility visibility,
             AccountBrief account) {
     }
 

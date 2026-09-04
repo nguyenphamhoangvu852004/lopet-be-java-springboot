@@ -1,7 +1,5 @@
 package com.nguyenvu.lopet.auth;
 
-import java.util.List;
-
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,13 +41,13 @@ public class AuthService {
                 .orElseThrow(() -> new NotFoundException("No user found"));
 
         if (account.getIsBanned() != null && account.getIsBanned() == 1) {
-            throw new BadRequestException("Người dùng " + account.getUsername() + " đã bị khoá");
+            throw new BadRequestException("User " + account.getUsername() + " is banned");
         }
         if (!passwordEncoder.matches(request.password(), account.getPassword())) {
-            throw new BadRequestException("Mật khẩu không trùng khớp");
+            throw new BadRequestException("Password does not match");
         }
 
-        UserPrincipal payload = new UserPrincipal(account.getId(), account.getEmail(), rolesOf(account));
+        UserPrincipal payload = new UserPrincipal(account.getId(), account.getEmail());
         return new IssuedTokens(account.getId(),
                 jwtService.generateAccessToken(payload),
                 jwtService.generateRefreshToken(payload));
@@ -58,7 +56,7 @@ public class AuthService {
     @Transactional(readOnly = true)
     public IssuedTokens refresh(String refreshToken) {
         if (refreshToken == null || refreshToken.isBlank()) {
-            throw new UnauthorizedException("Refresh token không hợp lệ");
+            throw new UnauthorizedException("Invalid refresh token");
         }
 
         UserPrincipal claims;
@@ -66,22 +64,22 @@ public class AuthService {
             claims = jwtService.parseRefreshToken(refreshToken);
         } catch (JwtException exception) {
             throw new UnauthorizedException(exception.isExpired()
-                    ? "Refresh token đã hết hạn"
-                    : "Refresh token không hợp lệ");
+                    ? "Refresh token has expired"
+                    : "Invalid refresh token");
         }
 
         if (claims.id() == null) {
-            throw new UnauthorizedException("Refresh token không hợp lệ");
+            throw new UnauthorizedException("Invalid refresh token");
         }
 
         Account account = accountRepository.findDetailById(claims.id())
-                .orElseThrow(() -> new UnauthorizedException("Refresh token không hợp lệ"));
+                .orElseThrow(() -> new UnauthorizedException("Invalid refresh token"));
 
         if (account.getIsBanned() != null && account.getIsBanned() == 1) {
-            throw new UnauthorizedException("Người dùng " + account.getUsername() + " đã bị khoá");
+            throw new UnauthorizedException("User " + account.getUsername() + " is banned");
         }
 
-        UserPrincipal payload = new UserPrincipal(account.getId(), account.getEmail(), rolesOf(account));
+        UserPrincipal payload = new UserPrincipal(account.getId(), account.getEmail());
         return new IssuedTokens(account.getId(),
                 jwtService.generateAccessToken(payload),
                 jwtService.generateRefreshToken(payload));
@@ -91,7 +89,7 @@ public class AuthService {
     public RegisterResponse register(RegisterRequest request) {
         String verified = otpStore.findVerifiedFlag(request.email());
         if (verified == null) {
-            throw new BadRequestException("Bạn cần xác thực OTP trước khi đăng ký.");
+            throw new BadRequestException("You must verify the OTP before registering.");
         }
         otpStore.deleteVerifiedFlag(request.email());
 
@@ -119,12 +117,12 @@ public class AuthService {
     @Transactional
     public ResetPasswordResponse resetPassword(ResetPasswordRequest request) {
         if (!request.password().equals(request.confirmPassword())) {
-            throw new BadRequestException("Mật khẩu xác nhận không khớp");
+            throw new BadRequestException("Password confirmation does not match");
         }
 
         String verified = otpStore.consumeVerifiedFlag(request.email());
         if (verified == null) {
-            throw new ForbiddenException("Bạn cần xác thực OTP trước khi đổi mật khẩu.");
+            throw new ForbiddenException("You must verify the OTP before changing the password.");
         }
 
         Account account = accountRepository.findDetailByEmail(request.email())
@@ -139,17 +137,12 @@ public class AuthService {
     @Transactional(readOnly = true)
     public VerifyAccountResponse verifyAccount(VerifyAccountRequest request) {
         Account account = accountRepository.findDetailByEmail(request.email())
-                .orElseThrow(() -> new NotFoundException("Không tim thấy tài khoản"));
+                .orElseThrow(() -> new NotFoundException("Account not found"));
 
         if (!passwordEncoder.matches(request.password(), account.getPassword())) {
-            throw new BadRequestException("Sai mật khẩu");
+            throw new BadRequestException("Wrong password");
         }
         return new VerifyAccountResponse(true);
     }
 
-    private List<String> rolesOf(Account account) {
-        return account.getAccountRoles().stream()
-                .map(accountRole -> accountRole.getRole().getName().name())
-                .toList();
-    }
 }

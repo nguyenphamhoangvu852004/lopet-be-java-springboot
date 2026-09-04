@@ -1,12 +1,16 @@
 server:
   port: ${APP_PORT:8080}
 
-
-  forward-headers-strategy: framework
-
-  shutdown: graceful
-
 spring:
+  rabbitmq:
+    host: ${RABBIT_MQ_HOST}
+    port: ${RABBIT_MQ_PORT}
+    username: ${RABBIT_MQ_USERNAME}
+    password: ${RABBIT_MQ_PASSWORD}
+    virtual-host: ${RABBIT_MQ_VHOST}
+    ssl:
+      enabled: true
+
   application:
     name: lopet
 

@@ -3,7 +3,7 @@ package com.nguyenvu.lopet.security;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
-import com.nguyenvu.lopet.common.exception.ForbiddenException;
+import com.nguyenvu.lopet.common.exception.UnauthorizedException;
 import com.nguyenvu.lopet.security.jwt.UserPrincipal;
 
 public final class CurrentUser {
@@ -19,14 +19,9 @@ public final class CurrentUser {
     public static UserPrincipal require() {
         UserPrincipal principal = optional();
         if (principal == null) {
-            throw new ForbiddenException("Chưa xác thực");
+            throw new UnauthorizedException("Authentication required");
         }
         return principal;
-    }
-
-    public static Integer viewerId() {
-        UserPrincipal principal = optional();
-        return principal == null ? null : principal.id();
     }
 
     private CurrentUser() {

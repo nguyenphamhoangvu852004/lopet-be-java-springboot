@@ -32,10 +32,10 @@ public class EmailService {
     public void verify(String email, String otp) {
         String saved = otpStore.findOtp(email);
         if (saved == null) {
-            throw new BadRequestException("OTP đã hết hạn hoặc không tồn tại.");
+            throw new BadRequestException("The OTP has expired or does not exist.");
         }
         if (!saved.equals(otp)) {
-            throw new BadRequestException("OTP không chính xác.");
+            throw new BadRequestException("The OTP is incorrect.");
         }
 
         otpStore.deleteOtp(email);
@@ -48,9 +48,9 @@ public class EmailService {
 
     private void send(String email, String otp) {
         try {
-            mailSender.sendHtml(email, "Mã xác thực OTP của bạn", body(otp));
+            mailSender.sendHtml(email, "Your OTP verification code", body(otp));
         } catch (Exception exception) {
-            log.error("Gửi mail OTP tới {} thất bại: {}", email, exception.getMessage());
+            log.error("Failed to send the OTP mail to {}: {}", email, exception.getMessage());
             throw new BadRequestException("Send email failed");
         }
     }
@@ -58,15 +58,15 @@ public class EmailService {
     private String body(String otp) {
         return """
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto;">
-                  <h2 style="color: #333;">Xác thực tài khoản</h2>
-                  <p>Chào bạn,</p>
-                  <p>Cảm ơn bạn đã đăng ký tài khoản. Đây là mã OTP để xác thực địa chỉ email của bạn:</p>
+                  <h2 style="color: #333;">Account verification</h2>
+                  <p>Hello,</p>
+                  <p>Thank you for signing up. Here is the OTP to verify your email address:</p>
                   <p style="font-size: 24px; font-weight: bold; color:rgb(111, 0, 255);">%s</p>
-                  <p>Mã OTP này có hiệu lực trong 2 phút.</p>
-                  <p>Nếu bạn không yêu cầu mã OTP này, vui lòng bỏ qua email này.</p>
+                  <p>This OTP is valid for 2 minutes.</p>
+                  <p>If you did not request this OTP, please ignore this email.</p>
                   <br>
-                  <p>Trân trọng,</p>
-                  <p><strong>Đội ngũ hỗ trợ</strong></p>
+                  <p>Best regards,</p>
+                  <p><strong>The support team</strong></p>
                 </div>
                 """.formatted(otp);
     }

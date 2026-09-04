@@ -29,7 +29,7 @@ public class SeedDemoAccount {
     @Transactional
     public void execute() {
         if (accountRepository.existsByEmail(DEMO_EMAIL)) {
-            log.debug("Bỏ qua seed tài khoản demo: {} đã tồn tại", DEMO_EMAIL);
+            log.debug("Skipping demo account seed: {} already exists", DEMO_EMAIL);
             return;
         }
 
@@ -45,6 +45,6 @@ public class SeedDemoAccount {
                         .isBanned(0)
                         .accountProfile(AccountProfileFactory.seedFor(dto.username()))
                         .build()).toList());
-        log.info("Đã seed tài khoản demo: {}", DEMO_EMAIL);
+        log.info("Demo account seeded: {}", DEMO_EMAIL);
     }
 }

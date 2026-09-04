@@ -13,7 +13,7 @@ import com.nguyenvu.lopet.comment.dto.CommentDtos;
 import com.nguyenvu.lopet.comment.entity.Comment;
 import com.nguyenvu.lopet.comment.repository.CommentRepository;
 import com.nguyenvu.lopet.common.exception.BadRequestException;
-import com.nguyenvu.lopet.notification.NotificationPublisher;
+import com.nguyenvu.lopet.common.exception.ForbiddenException;
 import com.nguyenvu.lopet.post.entity.Post;
 import com.nguyenvu.lopet.post.repository.PostRepository;
 
@@ -25,7 +25,6 @@ public class CommentService {
 
     private final CommentRepository commentRepository;
     private final PostRepository postRepository;
-    private final NotificationPublisher notificationPublisher;
     private final AccountRepository accountRepository;
 
     @Transactional
@@ -34,7 +33,7 @@ public class CommentService {
         Account account = accountRepository.findById(accountId)
                 .orElseThrow(() -> new BadRequestException("No account found"));
 
-        Post post = postRepository.findVisibleById(postId, accountId)
+        Post post = postRepository.findDetailById(postId)
                 .orElseThrow(() -> new BadRequestException("No post found"));
 
         Comment parent = null;
@@ -55,14 +54,12 @@ public class CommentService {
                 .post(post)
                 .build());
 
-        notificationPublisher.postCommented(accountId, ownerAccountIdOf(post), post.getId());
-
         return new CommentDtos.CreateCommentResponse(saved.getId());
     }
 
     @Transactional(readOnly = true)
-    public CommentDtos.GetCommentsResponse getAllFromPost(Integer postId, Integer viewerId) {
-        Post post = postRepository.findVisibleById(postId, viewerId)
+    public CommentDtos.GetCommentsResponse getAllFromPost(Integer postId) {
+        Post post = postRepository.findDetailById(postId)
                 .orElseThrow(() -> new BadRequestException("No post found"));
 
         List<CommentDtos.CommentItem> items = commentRepository.findAllByPostId(post.getId()).stream()
@@ -73,9 +70,15 @@ public class CommentService {
     }
 
     @Transactional
-    public CommentDtos.DeleteCommentResponse delete(Integer commentId) {
+    public CommentDtos.DeleteCommentResponse delete(Integer commentId, Integer callerId) {
         Comment comment = commentRepository.findDetailById(commentId)
                 .orElseThrow(() -> new BadRequestException("No comment found"));
+
+        // Only the comment author or the post owner may delete — replaces the removed ReBAC rule.
+        if (!callerId.equals(authorIdOf(comment)) && !callerId.equals(ownerAccountIdOf(comment.getPost()))) {
+            throw new ForbiddenException("You are not allowed to delete this comment");
+        }
+
         commentRepository.delete(comment);
         return new CommentDtos.DeleteCommentResponse(comment.getId());
     }
@@ -106,7 +109,11 @@ public class CommentService {
     }
 
     private Integer ownerAccountIdOf(Post post) {
-        return post.getAccount() == null ? null : post.getAccount().getId();
+        return post == null || post.getAccount() == null ? null : post.getAccount().getId();
+    }
+
+    private Integer authorIdOf(Comment comment) {
+        return comment.getAccount() == null ? null : comment.getAccount().getId();
     }
 
     private String orEmpty(String value) {

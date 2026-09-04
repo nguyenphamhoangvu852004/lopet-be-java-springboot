@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.Base64;
-import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
@@ -17,19 +16,18 @@ class JwtServiceTest {
     private final JwtService jwtService = new JwtService(JsonMapper.builder().build(),
             SHORT_SECRET, "test-refresh-secret-24by", 3600, 36000);
 
-    private final UserPrincipal principal = new UserPrincipal(7, "user@lopet.local", List.of("ADMIN"));
+    private final UserPrincipal principal = new UserPrincipal(7, "user@lopet.local");
 
     @Test
-    void sinh_va_giai_ma_token_giu_nguyen_payload() {
+    void generates_and_parses_token_preserving_payload() {
         UserPrincipal decoded = jwtService.parseAccessToken(jwtService.generateAccessToken(principal));
 
         assertThat(decoded.id()).isEqualTo(7);
         assertThat(decoded.email()).isEqualTo("user@lopet.local");
-        assertThat(decoded.roles()).containsExactly("ADMIN");
     }
 
     @Test
-    void header_giong_het_thu_vien_jsonwebtoken() {
+    void header_matches_the_jsonwebtoken_library() {
         String token = jwtService.generateAccessToken(principal);
         String header = new String(Base64.getUrlDecoder().decode(token.split("\\.")[0]));
 
@@ -37,7 +35,7 @@ class JwtServiceTest {
     }
 
     @Test
-    void payload_mang_du_iat_va_exp() {
+    void payload_carries_both_iat_and_exp() {
         String token = jwtService.generateAccessToken(principal);
         String body = new String(Base64.getUrlDecoder().decode(token.split("\\.")[1]));
 
@@ -45,7 +43,7 @@ class JwtServiceTest {
     }
 
     @Test
-    void token_bi_sua_chu_ky_bi_tu_choi() {
+    void token_with_tampered_signature_is_rejected() {
         String token = jwtService.generateAccessToken(principal);
         String tampered = token.substring(0, token.lastIndexOf('.') + 1) + "AAAAAAAAAAAAAAAAAAAAAA";
 
@@ -55,11 +53,11 @@ class JwtServiceTest {
     }
 
     @Test
-    void token_bi_sua_payload_bi_tu_choi() {
+    void token_with_tampered_payload_is_rejected() {
         String token = jwtService.generateAccessToken(principal);
         String[] parts = token.split("\\.");
         String forged = Base64.getUrlEncoder().withoutPadding()
-                .encodeToString("{\"id\":1,\"email\":\"admin@lopet.local\",\"roles\":[\"ADMIN\"]}".getBytes());
+                .encodeToString("{\"id\":1,\"email\":\"admin@lopet.local\"}".getBytes());
 
         assertThatThrownBy(() -> jwtService.parseAccessToken(parts[0] + "." + forged + "." + parts[2]))
                 .isInstanceOf(JwtException.class)
@@ -67,9 +65,9 @@ class JwtServiceTest {
     }
 
     @Test
-    void token_ky_bang_khoa_khac_bi_tu_choi() {
+    void token_signed_with_another_key_is_rejected() {
         JwtService other = new JwtService(JsonMapper.builder().build(),
-                "mot-khoa-hoan-toan-khac", "refresh", 3600, 36000);
+                "a-completely-different-key", "refresh", 3600, 36000);
 
         assertThatThrownBy(() -> jwtService.parseAccessToken(other.generateAccessToken(principal)))
                 .isInstanceOf(JwtException.class)
@@ -77,7 +75,7 @@ class JwtServiceTest {
     }
 
     @Test
-    void token_het_han_bao_dung_thong_diep_cua_jsonwebtoken() {
+    void expired_token_reports_the_jsonwebtoken_message() {
         JwtService expired = new JwtService(JsonMapper.builder().build(), SHORT_SECRET, "refresh", -10, -10);
 
         assertThatThrownBy(() -> expired.parseAccessToken(expired.generateAccessToken(principal)))
@@ -86,24 +84,17 @@ class JwtServiceTest {
     }
 
     @Test
-    void chuoi_khong_phai_jwt_bi_coi_la_malformed() {
-        assertThatThrownBy(() -> jwtService.parseAccessToken("khong-phai-token"))
+    void a_string_that_is_not_a_jwt_is_treated_as_malformed() {
+        assertThatThrownBy(() -> jwtService.parseAccessToken("not-a-token"))
                 .isInstanceOf(JwtException.class)
                 .hasMessage(JwtException.MALFORMED);
     }
 
     @Test
-    void access_token_va_refresh_token_khong_dung_chung_khoa() {
+    void access_token_and_refresh_token_do_not_share_a_key() {
         assertThatThrownBy(() -> jwtService.parseAccessToken(jwtService.generateRefreshToken(principal)))
                 .isInstanceOf(JwtException.class)
                 .hasMessage(JwtException.INVALID_SIGNATURE);
     }
 
-    @Test
-    void roles_khong_phai_mang_thi_coi_nhu_rong() {
-        JwtService service = new JwtService(JsonMapper.builder().build(), SHORT_SECRET, "refresh", 3600, 36000);
-        UserPrincipal khongCoRole = new UserPrincipal(3, "a@b.local", null);
-
-        assertThat(service.parseAccessToken(service.generateAccessToken(khongCoRole)).roles()).isEmpty();
-    }
 }

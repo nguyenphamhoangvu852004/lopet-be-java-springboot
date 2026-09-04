@@ -63,18 +63,18 @@ class AccountProfileRefactorIntegrationTest extends IntegrationTestBase {
     }
 
     @Nested
-    @DisplayName("Hồ sơ được cấp lúc tạo tài khoản")
-    class CapHoSo {
+    @DisplayName("The profile is provisioned when the account is created")
+    class ProfileProvisioning {
 
         @Test
-        @DisplayName("đăng ký xong là đã có hồ sơ, mang đúng dữ liệu seed")
-        void dangKyTaoLuonHoSo() {
+        @DisplayName("registering already yields a profile carrying the right seed data")
+        void registerProvisionsTheProfile() {
             Integer accountId = register("seed-user");
 
             AccountProfile profile = profileOf(accountId);
-            assertThat(profile).as("đăng ký phải cấp sẵn hồ sơ, không để người dùng tự tạo").isNotNull();
+            assertThat(profile).as("register must provision the profile rather than leave it to the user").isNotNull();
             assertThat(profile.getFullName()).isEqualTo("seed-user-" + RUN);
-            assertThat(profile.getBio()).isEqualTo("Xin chào, mình là seed-user-" + RUN);
+            assertThat(profile.getBio()).isEqualTo("Hello Lopet, I am seed-user-" + RUN);
             assertThat(profile.getPhoneNumber()).isEmpty();
             assertThat(profile.getHometown()).isEmpty();
             assertThat(profile.getAvatarUrl()).isEmpty();
@@ -84,133 +84,133 @@ class AccountProfileRefactorIntegrationTest extends IntegrationTestBase {
         }
 
         @Test
-        @DisplayName("tài khoản admin do bootstrap tạo cũng có hồ sơ")
-        void adminBootstrapCungCoHoSo() {
+        @DisplayName("the admin account created by bootstrap has a profile too")
+        void bootstrappedAdminAlsoHasAProfile() {
             Integer adminId = inTransaction(() -> accountRepository.findDetailByEmail(ADMIN_EMAIL)
-                    .orElseThrow(() -> new AssertionError("StartupRunner chưa tạo tài khoản admin"))
+                    .orElseThrow(() -> new AssertionError("StartupRunner has not created the admin account"))
                     .getId());
 
             assertThat(profileOf(adminId))
-                    .as("vá register() mà quên AdminInitializer thì admin vẫn rơi vào trạng thái không hồ sơ")
+                    .as("patching register() but forgetting AdminInitializer still leaves the admin profile-less")
                     .isNotNull();
         }
 
         @Test
-        @DisplayName("không còn API nào tạo hồ sơ rời — mọi hồ sơ đều gắn với một tài khoản")
-        void khongConHoSoMoCoi() {
+        @DisplayName("no API creates a standalone profile any more — every profile belongs to an account")
+        void noOrphanProfilesRemain() {
             register("no-orphan");
 
-            long moCoi = inTransaction(() -> accountProfileRepository.findAll().stream()
+            long orphans = inTransaction(() -> accountProfileRepository.findAll().stream()
                     .filter(profile -> profile.getAccount() == null)
                     .count());
 
-            assertThat(moCoi).as("hồ sơ mồ côi vĩnh viễn không sửa được vì không có chủ").isZero();
+            assertThat(orphans).as("an orphan profile is permanently unfixable because it has no owner").isZero();
         }
     }
 
     @Nested
-    @DisplayName("Cập nhật hồ sơ của chính mình")
-    class CapNhat {
+    @DisplayName("Updating your own profile")
+    class Updates {
 
         @Test
-        @DisplayName("trường không gửi thì giữ nguyên (ngữ nghĩa merge)")
-        void chiDoiTruongDuocGui() {
+        @DisplayName("a field that is not sent keeps its value (merge semantics)")
+        void onlySubmittedFieldsChange() {
             Integer accountId = register("merge-user");
-            profileService.updateMine(accountId, "Tên Ban Đầu", "0900000000", "Bio ban đầu",
-                    null, null, LocalDate.of(2000, 1, 15), "Đà Nẵng", 1, null);
+            profileService.updateMine(accountId, "Original Name", "0900000000", "Original bio",
+                    null, null, LocalDate.of(2000, 1, 15), "Da Nang", 1);
 
-            AccountProfileDtos.ProfileEntity sau = profileService.updateMine(accountId, "Tên Mới",
-                    null, null, null, null, null, null, null, null);
+            AccountProfileDtos.ProfileEntity updated = profileService.updateMine(accountId, "New Name",
+                    null, null, null, null, null, null, null);
 
-            assertThat(sau.fullName()).isEqualTo("Tên Mới");
-            assertThat(sau.bio()).isEqualTo("Bio ban đầu");
-            assertThat(sau.phoneNumber()).isEqualTo("0900000000");
-            assertThat(sau.hometown()).isEqualTo("Đà Nẵng");
-            assertThat(sau.dateOfBirth()).isEqualTo(LocalDate.of(2000, 1, 15));
-            assertThat(sau.sex()).isEqualTo(1);
+            assertThat(updated.fullName()).isEqualTo("New Name");
+            assertThat(updated.bio()).isEqualTo("Original bio");
+            assertThat(updated.phoneNumber()).isEqualTo("0900000000");
+            assertThat(updated.hometown()).isEqualTo("Da Nang");
+            assertThat(updated.dateOfBirth()).isEqualTo(LocalDate.of(2000, 1, 15));
+            assertThat(updated.sex()).isEqualTo(1);
         }
 
         @Test
-        @DisplayName("chuỗi rỗng VẪN ghi đè — người dùng phải xoá được bio của mình")
-        void chuoiRongVanGhiDe() {
+        @DisplayName("an empty string DOES overwrite — a user must be able to clear their bio")
+        void emptyStringStillOverwrites() {
             Integer accountId = register("clear-bio");
-            profileService.updateMine(accountId, null, null, "Bio sẽ bị xoá",
-                    null, null, null, null, null, null);
+            profileService.updateMine(accountId, null, null, "Bio to be cleared",
+                    null, null, null, null, null);
 
-            AccountProfileDtos.ProfileEntity sau = profileService.updateMine(accountId, null, null, "",
-                    null, null, null, null, null, null);
+            AccountProfileDtos.ProfileEntity updated = profileService.updateMine(accountId, null, null, "",
+                    null, null, null, null, null);
 
-            assertThat(sau.bio()).isEmpty();
+            assertThat(updated.bio()).isEmpty();
         }
 
         @Test
-        @DisplayName("cập nhật không kèm file thì KHÔNG xoá ảnh đang có")
-        void khongDinhFileThiGiuNguyenAnh() {
+        @DisplayName("an update without files does NOT clear the existing images")
+        void updateWithoutFilesKeepsImages() {
             Integer accountId = register("keep-avatar");
             profileService.updateMine(accountId, null, null, null,
-                    "https://cdn.local/avatar.png", "https://cdn.local/cover.png", null, null, null, null);
+                    "https://cdn.local/avatar.png", "https://cdn.local/cover.png", null, null, null);
 
-            AccountProfileDtos.ProfileEntity sau = profileService.updateMine(accountId, null, null,
-                    "Chỉ sửa bio thôi", null, null, null, null, null, null);
+            AccountProfileDtos.ProfileEntity updated = profileService.updateMine(accountId, null, null,
+                    "Editing the bio only", null, null, null, null, null);
 
-            assertThat(sau.avatarUrl()).isEqualTo("https://cdn.local/avatar.png");
-            assertThat(sau.coverUrl()).isEqualTo("https://cdn.local/cover.png");
-            assertThat(sau.bio()).isEqualTo("Chỉ sửa bio thôi");
+            assertThat(updated.avatarUrl()).isEqualTo("https://cdn.local/avatar.png");
+            assertThat(updated.coverUrl()).isEqualTo("https://cdn.local/cover.png");
+            assertThat(updated.bio()).isEqualTo("Editing the bio only");
         }
     }
 
     @Nested
-    @DisplayName("Cách ly giữa các tài khoản")
-    class CachLy {
+    @DisplayName("Isolation between accounts")
+    class Isolation {
 
         @Test
-        @DisplayName("sửa hồ sơ của mình không đụng tới hồ sơ người khác")
-        void suaHoSoMinhKhongDungNguoiKhac() {
-            Integer nanNhan = register("victim");
-            Integer keLa = register("stranger");
-            profileService.updateMine(nanNhan, "Hồ sơ nạn nhân", null, "Bio nạn nhân",
-                    "https://cdn.local/victim.png", null, null, null, null, null);
+        @DisplayName("editing your own profile does not touch anyone elses")
+        void editingOwnProfileLeavesOthersAlone() {
+            Integer victim = register("victim");
+            Integer stranger = register("stranger");
+            profileService.updateMine(victim, "Victim profile", null, "Victim bio",
+                    "https://cdn.local/victim.png", null, null, null, null);
 
-            profileService.updateMine(keLa, "Hồ sơ kẻ lạ", null, "Bio kẻ lạ", null, null, null, null, null, null);
+            profileService.updateMine(stranger, "Stranger profile", null, "Stranger bio", null, null, null, null, null);
 
-            AccountProfileDtos.ProfileSummary cuaNanNhan = profileService.findByAccountId(nanNhan);
-            assertThat(cuaNanNhan.fullName()).isEqualTo("Hồ sơ nạn nhân");
-            assertThat(cuaNanNhan.bio()).isEqualTo("Bio nạn nhân");
-            assertThat(cuaNanNhan.avatarUrl()).isEqualTo("https://cdn.local/victim.png");
-            assertThat(profileService.findByAccountId(keLa).fullName()).isEqualTo("Hồ sơ kẻ lạ");
+            AccountProfileDtos.ProfileSummary victimProfile = profileService.findByAccountId(victim);
+            assertThat(victimProfile.fullName()).isEqualTo("Victim profile");
+            assertThat(victimProfile.bio()).isEqualTo("Victim bio");
+            assertThat(victimProfile.avatarUrl()).isEqualTo("https://cdn.local/victim.png");
+            assertThat(profileService.findByAccountId(stranger).fullName()).isEqualTo("Stranger profile");
         }
 
         @Test
-        @DisplayName("mỗi tài khoản có hồ sơ riêng, không dùng chung row")
-        void moiTaiKhoanMotHoSoRieng() {
-            Integer mot = register("own-a");
-            Integer hai = register("own-b");
+        @DisplayName("each account owns its own profile, never a shared row")
+        void eachAccountOwnsItsProfile() {
+            Integer first = register("own-a");
+            Integer second = register("own-b");
 
-            assertThat(profileOf(mot).getId()).isNotEqualTo(profileOf(hai).getId());
+            assertThat(profileOf(first).getId()).isNotEqualTo(profileOf(second).getId());
         }
     }
 
     @Nested
-    @DisplayName("Đọc hồ sơ của chính mình")
-    class DocHoSo {
+    @DisplayName("Reading your own profile")
+    class ReadOwnProfile {
 
         @Test
-        @DisplayName("GET /me trả đúng hồ sơ của người gọi, không cần biết profileId")
-        void traDungHoSoCuaNguoiGoi() {
+        @DisplayName("GET /me returns the callers own profile without needing a profileId")
+        void returnsTheCallersOwnProfile() {
             Integer accountId = register("read-me");
-            profileService.updateMine(accountId, "Tên hiển thị", null, null, null, null, null, null, null, null);
+            profileService.updateMine(accountId, "Display name", null, null, null, null, null, null, null);
 
-            AccountProfileDtos.ProfileSummary cuaToi = profileService.findByAccountId(accountId);
+            AccountProfileDtos.ProfileSummary mine = profileService.findByAccountId(accountId);
 
-            assertThat(cuaToi.id()).isEqualTo(profileOf(accountId).getId());
-            assertThat(cuaToi.fullName()).isEqualTo("Tên hiển thị");
+            assertThat(mine.id()).isEqualTo(profileOf(accountId).getId());
+            assertThat(mine.fullName()).isEqualTo("Display name");
         }
 
         @Test
-        @DisplayName("tài khoản không có hồ sơ thì cập nhật báo lỗi chỉ rõ cần backfill")
-        void thieuHoSoThiBaoLoiRoRang() {
+        @DisplayName("updating an account without a profile fails with an error naming the backfill")
+        void missingProfileFailsWithAClearError() {
             assertThatThrownBy(() -> profileService.updateMine(-1, "x", null, null,
-                    null, null, null, null, null, null))
+                    null, null, null, null, null))
                     .isInstanceOf(NotFoundException.class)
                     .hasMessageContaining("backfill");
         }

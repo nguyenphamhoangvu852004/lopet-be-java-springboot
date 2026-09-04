@@ -17,7 +17,6 @@ import com.nguyenvu.lopet.common.media.CloudinaryService;
 import com.nguyenvu.lopet.common.response.ApiResponse;
 import com.nguyenvu.lopet.security.Auth;
 import com.nguyenvu.lopet.security.CurrentUser;
-import com.nguyenvu.lopet.security.RequirePermission;
 
 import lombok.RequiredArgsConstructor;
 
@@ -37,15 +36,12 @@ public class AccountProfileController {
     }
 
     @GetMapping("/accounts/{id}")
-    @Auth(required = false)
     public ApiResponse<AccountProfileDtos.PublicProfile> getByAccountId(@PathVariable Integer id) {
-        return ApiResponse.ok("Get profile successfully",
-                profileService.findVisibleByAccountId(id, CurrentUser.viewerId()));
+        return ApiResponse.ok("Get profile successfully", profileService.findPublicByAccountId(id));
     }
 
     @PutMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Auth
-    @RequirePermission("accountProfile:update:own")
     public ApiResponse<AccountProfileDtos.ProfileEntity> update(
             @RequestParam(required = false) String fullName,
             @RequestParam(required = false) String phoneNumber,
@@ -53,13 +49,11 @@ public class AccountProfileController {
             @RequestParam(required = false) String dateOfBirth,
             @RequestParam(required = false) String hometown,
             @RequestParam(required = false) Integer sex,
-            @RequestParam(required = false) String visibility,
             @RequestPart(name = "avatar", required = false) MultipartFile avatar,
             @RequestPart(name = "cover", required = false) MultipartFile cover) {
         return ApiResponse.ok("Update profile successfully",
                 profileService.updateMine(CurrentUser.require().id(), fullName, phoneNumber, bio,
-                        uploadOrNull(avatar), uploadOrNull(cover), parseDate(dateOfBirth), hometown, sex,
-                        visibility));
+                        uploadOrNull(avatar), uploadOrNull(cover), parseDate(dateOfBirth), hometown, sex));
     }
 
     private String uploadOrNull(MultipartFile file) {

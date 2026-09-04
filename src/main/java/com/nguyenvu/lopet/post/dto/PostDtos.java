@@ -4,7 +4,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import com.nguyenvu.lopet.post.entity.MediaType;
-import com.nguyenvu.lopet.post.entity.PostScope;
 
 public final class PostDtos {
 
@@ -71,7 +70,6 @@ public final class PostDtos {
             Integer accountId,
             Integer postId,
             String content,
-            PostScope scope,
             List<MediaWithId> postMedias,
             LocalDateTime createdAt,
             LocalDateTime updatedAt) {
@@ -81,7 +79,6 @@ public final class PostDtos {
             Integer owner,
             Integer postId,
             String content,
-            PostScope scope,
             List<MediaWithId> postMedias,
             LocalDateTime createdAt,
             LocalDateTime updatedAt) {

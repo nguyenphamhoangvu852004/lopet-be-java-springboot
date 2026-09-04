@@ -13,8 +13,6 @@ import com.nguyenvu.lopet.common.entity.BaseEntity;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -50,12 +48,6 @@ public class Post extends BaseEntity {
 
     @Column(name = "content", nullable = false, columnDefinition = "text")
     private String content;
-
-    @Builder.Default
-    @Enumerated(EnumType.STRING)
-    @Column(name = "postScope", nullable = false,
-            columnDefinition = "enum('PUBLIC','FRIEND','PRIVATE') not null default 'PUBLIC'")
-    private PostScope postScope = PostScope.PUBLIC;
 
     @Builder.Default
     @OneToMany(mappedBy = "post", fetch = FetchType.LAZY, cascade = CascadeType.ALL)

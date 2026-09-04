@@ -31,7 +31,7 @@ public class ResendMailSender {
                 .build();
 
         CreateEmailResponse response = resend.emails().send(options);
-        log.debug("Resend đã nhận mail {} gửi tới {}", response.getId(), to);
+        log.debug("Resend accepted mail {} addressed to {}", response.getId(), to);
         return response.getId();
     }
 }

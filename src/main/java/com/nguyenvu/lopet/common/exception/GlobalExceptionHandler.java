@@ -4,6 +4,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.springframework.data.redis.RedisConnectionFailureException;
+import org.springframework.data.redis.RedisSystemException;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
@@ -11,6 +13,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import com.anthropic.errors.AnthropicException;
 import com.nguyenvu.lopet.common.response.HttpStatusMessage;
 
 import lombok.extern.slf4j.Slf4j;
@@ -44,8 +47,22 @@ public class GlobalExceptionHandler {
                 .collect(Collectors.joining(", "));
         String message = supported.isEmpty()
                 ? exception.getMessage()
-                : exception.getMessage() + ". Endpoint chỉ nhận: " + supported;
+                : exception.getMessage() + ". Endpoint only accepts: " + supported;
         return ResponseEntity.status(415).body(new ErrorResponse(415, message));
+    }
+
+    @ExceptionHandler({RedisConnectionFailureException.class, RedisSystemException.class})
+    public ResponseEntity<ErrorResponse> handleRedisFailure(RuntimeException exception) {
+        log.error("Redis failure", exception);
+        return ResponseEntity.status(503)
+                .body(new ErrorResponse(503, "The cache backend is temporarily unavailable, please try again later"));
+    }
+
+    @ExceptionHandler(AnthropicException.class)
+    public ResponseEntity<ErrorResponse> handleAnthropicFailure(AnthropicException exception) {
+        log.error("Anthropic call failed", exception);
+        return ResponseEntity.status(503)
+                .body(new ErrorResponse(503, "The assistant is not responding, please try again later"));
     }
 
     @ExceptionHandler(Exception.class)

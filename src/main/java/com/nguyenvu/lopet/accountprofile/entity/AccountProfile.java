@@ -9,8 +9,6 @@ import com.nguyenvu.lopet.common.entity.BaseEntity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -60,12 +58,6 @@ public class AccountProfile extends BaseEntity {
 
     @Column(name = "coverUrl", columnDefinition = "text")
     private String coverUrl;
-
-    @Builder.Default
-    @Enumerated(EnumType.STRING)
-    @Column(name = "visibility", nullable = false,
-            columnDefinition = "enum('PUBLIC','FRIEND','PRIVATE') not null default 'PUBLIC'")
-    private ProfileVisibility visibility = ProfileVisibility.PUBLIC;
 
     @OneToOne(mappedBy = "accountProfile", fetch = FetchType.LAZY)
     private Account account;

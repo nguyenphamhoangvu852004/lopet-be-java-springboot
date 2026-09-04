@@ -11,6 +11,7 @@ public final class HttpStatusMessage {
     public static final String NOT_FOUND = "NOT FOUND";
     public static final String CONFLICT = "CONFLICT";
     public static final String INTERNAL_SERVER_ERROR = "INTERNAL SERVER ERROR";
+    public static final String SERVICE_UNAVAILABLE = "SERVICE UNAVAILABLE";
 
     private HttpStatusMessage() {
     }

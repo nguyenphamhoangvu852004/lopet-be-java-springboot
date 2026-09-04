@@ -1,30 +1,30 @@
-# Giá trị cho @ActiveProfiles("test"). Tồn tại để test KHÔNG phụ thuộc file .env của máy dev:
-# application.yml chỉ khai ${VAR} không có mặc định, nên thiếu file này thì context test vỡ trên CI.
-# Toàn bộ là giá trị giả — secret thật chỉ sống trong .env.
+# Values for @ActiveProfiles("test"). It exists so the tests do NOT depend on a dev machine's .env:
+# application.yml only declares ${VAR} without defaults, so without this file the test context breaks on CI.
+# Everything here is fake — the real secrets live only in .env.
 server:
   port: 0
 
 spring:
   jpa:
     hibernate:
-      # Ghi đè tường minh, không dựa vào giá trị của application.yml: mỗi test class dùng một database
-      # rỗng (createDatabaseIfNotExist=true), nên thiếu bước sinh schema là toàn bộ test tích hợp vỡ.
+      # Set explicitly rather than inherited from application.yml: each test class uses an empty
+      # database (createDatabaseIfNotExist=true), so without schema generation every integration test breaks.
       ddl-auto: update
 
-  # spring.datasource.url được từng test class ghi đè qua @DynamicPropertySource
-  # (xem IntegrationTestBase.jdbcUrl) để mỗi bộ test có database riêng.
+  # spring.datasource.url is overridden per test class through @DynamicPropertySource
+  # (see IntegrationTestBase.jdbcUrl) so each suite gets its own database.
   datasource:
     url: jdbc:mysql://127.0.0.1:3307/lopet_java_test?useUnicode=true&characterEncoding=utf8&allowPublicKeyRetrieval=true&useSSL=false&createDatabaseIfNotExist=true
     username: root
     password: nguyenvu
 
-  # `url` PHẢI có mặt: application.yml khai `spring.data.redis.url: ${REDIS_URL}`, và khi không có
-  # file .env thì chuỗi `${REDIS_URL}` đi nguyên văn xuống Lettuce -> "Invalid Redis URL" làm vỡ context
-  # của MọI test tích hợp. Chỉ khai host/port là không đủ vì `url` được ưu tiên hơn.
+  # `url` MUST be present: application.yml declares `spring.data.redis.url: ${REDIS_URL}`, and with no
+  # .env file the literal string `${REDIS_URL}` reaches Lettuce -> "Invalid Redis URL", breaking the
+  # context of EVERY integration test. Declaring host/port alone is not enough because `url` wins.
   #
-  # DATABASE 1, KHÔNG phải 0: ứng dụng dev chạy trên cùng Redis và dùng db 0. Database test được dựng
-  # lại từ entity nên id đếm lại từ 1 và trùng ngay với id của dev. Biểu hiện là test đỏ
-  # với "expected: 4 but was: 2", nhưng nguyên nhân không nằm ở code nào trong repo này cả.
+  # DATABASE 1, NOT 0: the dev application runs against the same Redis and uses db 0. The test database
+  # is rebuilt from the entities, so ids restart at 1 and immediately collide with dev ids. It shows up
+  # as a red test saying "expected: 4 but was: 2", with no code in this repo actually at fault.
   data:
     redis:
       url: redis://localhost:6379/1
@@ -56,12 +56,12 @@ lopet:
     from: Lopet Test <test@lopet.local>
     admin-receiver: admin@lopet.local
     resend:
-      # Khoá giả: test không được gọi ra Resend thật. Bean Resend chỉ giữ chuỗi này, không gọi mạng
-      # lúc tạo, nên context vẫn lên bình thường.
+      # Fake key: tests must not reach the real Resend. The Resend bean only holds this string and
+      # makes no network call on creation, so the context still comes up fine.
       api-key: re_test_fake_key
 
-  # Để trống ba biến này là có chủ đích: AdminInitializer bỏ qua khi cấu hình rỗng, nên test không
-  # tạo tài khoản admin trong database test.
+  # Leaving these three blank is deliberate: AdminInitializer skips when the config is empty, so the
+  # tests do not create an admin account in the test database.
   admin:
     email: ''
     username: ''

@@ -12,6 +12,8 @@ services:
     image: mysql:8.4
     container_name: lopet-mysql
     restart: always
+    ports:
+      - 3307:3306
     environment:
       MYSQL_ROOT_PASSWORD: ${DATABASE_PASSWORD}
       MYSQL_DATABASE: ${DATABASE_NAME}
@@ -29,6 +31,8 @@ services:
   lopet-redis:
     image: redis:8.0
     container_name: lopet-redis
+    ports:
+      - 6379:6379
     restart: always
     mem_limit: 100m
     networks:
@@ -45,7 +49,7 @@ services:
     env_file:
       - .env.dev
     environment:
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE}   # lấy từ .env, không hardcode
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE}   # taken from .env, never hardcoded
     expose:
       - "8080"
     depends_on:

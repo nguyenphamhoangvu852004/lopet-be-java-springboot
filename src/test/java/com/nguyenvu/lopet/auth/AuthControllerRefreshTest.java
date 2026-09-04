@@ -22,7 +22,6 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import com.nguyenvu.lopet.common.exception.GlobalExceptionHandler;
 import com.nguyenvu.lopet.common.exception.UnauthorizedException;
 import com.nguyenvu.lopet.security.AuthInterceptor;
-import com.nguyenvu.lopet.security.jwt.JwtAuthenticationFilter;
 
 import jakarta.servlet.http.Cookie;
 
@@ -48,53 +47,52 @@ class AuthControllerRefreshTest {
     }
 
     @Test
-    void gia_han_duoc_ngay_ca_khi_access_token_da_hong() throws Exception {
-        when(authService.refresh("token-hop-le"))
-                .thenReturn(new IssuedTokens(7, "access-moi", "refresh-moi"));
+    void refreshes_even_when_the_access_token_is_broken() throws Exception {
+        when(authService.refresh("valid-token"))
+                .thenReturn(new IssuedTokens(7, "new-access", "new-refresh"));
 
         mockMvc.perform(post("/v1/auth/refresh")
-                        .cookie(new Cookie(COOKIE, "token-hop-le"))
-                        .requestAttr(JwtAuthenticationFilter.ATTRIBUTE_STATE,
-                                JwtAuthenticationFilter.TokenState.INVALID))
+                        .cookie(new Cookie(COOKIE, "valid-token"))
+                        .header("Authorization", "Bearer broken-access-token"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.statusCode").value(200))
-                .andExpect(jsonPath("$.data.accessToken").value("access-moi"))
+                .andExpect(jsonPath("$.data.accessToken").value("new-access"))
                 .andExpect(jsonPath("$.data.refreshToken").doesNotExist())
-                .andExpect(cookie().value(COOKIE, "refresh-moi"))
+                .andExpect(cookie().value(COOKIE, "new-refresh"))
                 .andExpect(cookie().httpOnly(COOKIE, true));
     }
 
     @Test
-    void refresh_token_hong_tra_401_de_client_xoa_phien() throws Exception {
-        when(authService.refresh(any())).thenThrow(new UnauthorizedException("Refresh token đã hết hạn"));
+    void broken_refresh_token_returns_401_so_the_client_clears_the_session() throws Exception {
+        when(authService.refresh(any())).thenThrow(new UnauthorizedException("Refresh token has expired"));
 
         mockMvc.perform(post("/v1/auth/refresh")
-                        .cookie(new Cookie(COOKIE, "token-het-han")))
+                        .cookie(new Cookie(COOKIE, "expired-token")))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.message").value("Refresh token đã hết hạn"));
+                .andExpect(jsonPath("$.message").value("Refresh token has expired"));
     }
 
     @Test
-    void thieu_cookie_thi_service_nhan_null() throws Exception {
-        when(authService.refresh(isNull())).thenThrow(new UnauthorizedException("Refresh token không hợp lệ"));
+    void a_missing_cookie_reaches_the_service_as_null() throws Exception {
+        when(authService.refresh(isNull())).thenThrow(new UnauthorizedException("Invalid refresh token"));
 
         mockMvc.perform(post("/v1/auth/refresh"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.message").value("Refresh token không hợp lệ"));
+                .andExpect(jsonPath("$.message").value("Invalid refresh token"));
     }
 
     @Test
-    void dang_nhap_tra_refresh_token_qua_cookie_httponly_chu_khong_qua_body() throws Exception {
-        when(authService.login(any())).thenReturn(new IssuedTokens(7, "access-moi", "refresh-moi"));
+    void login_returns_the_refresh_token_in_an_httponly_cookie_not_in_the_body() throws Exception {
+        when(authService.login(any())).thenReturn(new IssuedTokens(7, "new-access", "new-refresh"));
 
         MockHttpServletResponse response = mockMvc.perform(post("/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"username\":\"user\",\"password\":\"secret\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.id").value(7))
-                .andExpect(jsonPath("$.data.accessToken").value("access-moi"))
+                .andExpect(jsonPath("$.data.accessToken").value("new-access"))
                 .andExpect(jsonPath("$.data.refreshToken").doesNotExist())
-                .andExpect(cookie().value(COOKIE, "refresh-moi"))
+                .andExpect(cookie().value(COOKIE, "new-refresh"))
                 .andExpect(cookie().httpOnly(COOKIE, true))
                 .andExpect(cookie().maxAge(COOKIE, 36000))
                 .andExpect(cookie().path(COOKIE, "/"))

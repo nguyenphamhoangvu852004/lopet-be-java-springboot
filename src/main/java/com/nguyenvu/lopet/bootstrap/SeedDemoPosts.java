@@ -6,7 +6,6 @@ import com.nguyenvu.lopet.account.repository.AccountRepository;
 import com.nguyenvu.lopet.post.entity.MediaType;
 import com.nguyenvu.lopet.post.entity.Post;
 import com.nguyenvu.lopet.post.entity.PostMedia;
-import com.nguyenvu.lopet.post.entity.PostScope;
 import com.nguyenvu.lopet.post.repository.PostRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -50,12 +49,12 @@ public class SeedDemoPosts {
         Account demoAccount = accountRepository.findDetailByEmail(SeedDemoAccount.DEMO_EMAIL)
                 .orElse(null);
         if (demoAccount == null) {
-            log.warn("Bỏ qua seed bài đăng demo: không tìm thấy tài khoản {}", SeedDemoAccount.DEMO_EMAIL);
+            log.warn("Skipping demo post seed: account {} not found", SeedDemoAccount.DEMO_EMAIL);
             return;
         }
 
         if (postRepository.existsByAccountId(demoAccount.getId())) {
-            log.debug("Bỏ qua seed bài đăng demo: tài khoản {} đã có bài", SeedDemoAccount.DEMO_EMAIL);
+            log.debug("Skipping demo post seed: account {} already has posts", SeedDemoAccount.DEMO_EMAIL);
             return;
         }
 
@@ -64,7 +63,6 @@ public class SeedDemoPosts {
             Post p = Post.builder()
                     .account(demoAccount)
                     .content(faker.lorem().paragraph())
-                    .postScope(PostScope.PUBLIC)
                     .build();
 
             PostMedia media = PostMedia.builder()
@@ -76,7 +74,7 @@ public class SeedDemoPosts {
 
             this.postRepository.save(p);
         }
-        log.info("Đã seed {} bài đăng demo cho {}", listImageURLs.size() - 1, SeedDemoAccount.DEMO_EMAIL);
+        log.info("Seeded {} demo posts for {}", listImageURLs.size() - 1, SeedDemoAccount.DEMO_EMAIL);
     }
 
 }

@@ -1,8 +1,5 @@
 package com.nguyenvu.lopet.account.entity;
 
-import java.util.LinkedHashSet;
-import java.util.Set;
-
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.annotations.SQLRestriction;
@@ -18,7 +15,6 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.OneToMany;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -58,8 +54,4 @@ public class Account extends BaseEntity {
     @JoinColumn(name = "account_profile_id")
     @OnDelete(action = OnDeleteAction.CASCADE)
     private AccountProfile accountProfile;
-
-    @Builder.Default
-    @OneToMany(mappedBy = "account", fetch = FetchType.LAZY)
-    private Set<AccountRole> accountRoles = new LinkedHashSet<>();
 }

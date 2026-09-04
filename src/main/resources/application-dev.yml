@@ -10,6 +10,13 @@ spring:
   devtools:
     restart:
       enabled: false
+  ai:
+    anthropic:
+      api-key: ${ANTHROPIC_API_KEY}
+      chat:
+        max-tokens: ${ANTHROPIC_MAX_TOKENS}
+        model: ${ANTHROPIC_MODEL}
+
 
 lopet:
   bootstrap:

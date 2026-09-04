@@ -1,5 +1,6 @@
 package com.nguyenvu.lopet.account.repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -12,19 +13,19 @@ import com.nguyenvu.lopet.account.entity.Account;
 
 public interface AccountRepository extends JpaRepository<Account, Integer> {
 
-    @EntityGraph(attributePaths = {"accountProfile", "accountRoles", "accountRoles.role"})
+    @EntityGraph(attributePaths = {"accountProfile"})
     @Query("select a from Account a where a.id = :id")
     Optional<Account> findDetailById(@Param("id") Integer id);
 
-    @EntityGraph(attributePaths = {"accountProfile", "accountRoles", "accountRoles.role"})
+    @EntityGraph(attributePaths = {"accountProfile"})
     @Query("select a from Account a where a.email = :email")
     Optional<Account> findDetailByEmail(@Param("email") String email);
 
-    @EntityGraph(attributePaths = {"accountProfile", "accountRoles", "accountRoles.role"})
+    @EntityGraph(attributePaths = {"accountProfile"})
     @Query("select a from Account a where a.username = :username")
     Optional<Account> findDetailByUsername(@Param("username") String username);
 
-    @EntityGraph(attributePaths = {"accountProfile", "accountRoles", "accountRoles.role"})
+    @EntityGraph(attributePaths = {"accountProfile"})
     @Query("select distinct a from Account a")
     List<Account> findAllDetail();
 
@@ -35,12 +36,6 @@ public interface AccountRepository extends JpaRepository<Account, Integer> {
             where a.deletedAt is null
               and a.isBanned = 0
               and a.id <> :accountId
-              and not exists (
-                    select 1 from friend_ships f
-                    where f.deletedAt is null
-                      and ((f.sender_id = :accountId and f.receiver_id = a.id)
-                        or (f.receiver_id = :accountId and f.sender_id = a.id))
-              )
             order by rand()
             """, nativeQuery = true)
     List<Account> findSuggestions(@Param("accountId") Integer accountId);
@@ -50,14 +45,17 @@ public interface AccountRepository extends JpaRepository<Account, Integer> {
             where a.deletedAt is null
               and a.isBanned = 0
               and a.id <> :accountId
-              and not exists (
-                    select 1 from friend_ships f
-                    where f.deletedAt is null
-                      and ((f.sender_id = :accountId and f.receiver_id = a.id)
-                        or (f.receiver_id = :accountId and f.sender_id = a.id))
-              )
             order by rand()
             limit :maxResults
             """, nativeQuery = true)
     List<Account> findSuggestions(@Param("accountId") Integer accountId, @Param("maxResults") int maxResults);
+
+    long countByDeletedAtIsNull();
+
+    long countByDeletedAtIsNullAndIsBanned(Integer isBanned);
+
+    long countByDeletedAtIsNotNull();
+
+    long countByCreatedAtGreaterThanEqual(LocalDateTime since);
+
 }
