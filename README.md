@@ -15,3 +15,5 @@ Deploy: https://api.nguyenvu.io.vn/swagger-ui.html
 **Infra:** Docker, Caddy (reverse proxy/TLS), VPS deployment
 
 ## Architecture
+**Request Life Cycle**
+<img width="1405" height="437" alt="image" src="https://github.com/user-attachments/assets/e3a9c8c2-5fc2-447e-9039-75dceb4245c5" />
