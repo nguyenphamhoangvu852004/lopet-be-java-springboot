@@ -14,4 +14,4 @@ Deploy: https://api.nguyenvu.io.vn/swagger-ui.html
 
 **Infra:** Docker, Caddy (reverse proxy/TLS), VPS deployment
 
-## Project Structure
+## Architecture
