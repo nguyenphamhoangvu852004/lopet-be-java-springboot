@@ -5,7 +5,6 @@ import com.nguyenvu.lopet.account.entity.Account;
 import com.nguyenvu.lopet.account.repository.AccountRepository;
 import com.nguyenvu.lopet.post.entity.MediaType;
 import com.nguyenvu.lopet.post.entity.Post;
-import com.nguyenvu.lopet.post.entity.PostMedia;
 import com.nguyenvu.lopet.post.repository.PostRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -60,17 +59,8 @@ public class SeedDemoPosts {
 
         Faker faker = new Faker();
         for (int i = 1; i < listImageURLs.size(); i++) {
-            Post p = Post.builder()
-                    .account(demoAccount)
-                    .content(faker.lorem().paragraph())
-                    .build();
-
-            PostMedia media = PostMedia.builder()
-                    .mediaType(MediaType.IMAGE)
-                    .mediaUrl("https://res.cloudinary.com/dmsnw2qpd/image/upload/v1787728262/" +listImageURLs.get(i))
-                    .post(p)
-                    .build();
-            p.getPostMedias().add(media);
+            Post p = Post.create(demoAccount, faker.lorem().paragraph());
+            p.addMedia(cloudinaryURL + listImageURLs.get(i), MediaType.IMAGE);
 
             this.postRepository.save(p);
         }

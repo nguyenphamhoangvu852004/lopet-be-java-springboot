@@ -21,7 +21,7 @@ spring:
     timeout-per-shutdown-phase: 20s
 
   datasource:
-    url: jdbc:mysql://${DATABASE_HOSTNAME:localhost}:${DATABASE_PORT:3306}/${DATABASE_NAME:socialmedia}?useUnicode=true&characterEncoding=utf8&allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
+    url: jdbc:mysql://${DATABASE_HOSTNAME}:${DATABASE_PORT}/${DATABASE_NAME}?useUnicode=true&characterEncoding=utf8&allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
     username: ${DATABASE_USERNAME:root}
     password: ${DATABASE_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver

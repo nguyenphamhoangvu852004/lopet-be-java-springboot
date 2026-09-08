@@ -17,17 +17,20 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 
+/**
+ * Thành phần của aggregate {@link Post}. Chỉ được tạo qua {@link Post#addMedia},
+ * nên builder để mức package.
+ */
 @Getter
-@Setter
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
+@Builder(access = AccessLevel.PACKAGE)
+@AllArgsConstructor(access = AccessLevel.PACKAGE)
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "post_medias")
 @SQLRestriction("deletedAt is null")
@@ -48,4 +51,9 @@ public class PostMedia extends BaseEntity {
     @JoinColumn(name = "post_id", nullable = false)
     @OnDelete(action = OnDeleteAction.CASCADE)
     private Post post;
+
+    /** Chỉ {@link Post#deleteBy} gọi — markDeleted() là protected của BaseEntity. */
+    void softDelete() {
+        markDeleted();
+    }
 }

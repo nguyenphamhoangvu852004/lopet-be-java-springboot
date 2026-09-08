@@ -1,21 +1,15 @@
 package com.nguyenvu.lopet.llms;
 
-import java.util.Arrays;
-import java.util.List;
-import java.util.UUID;
-
-import org.springframework.ai.anthropic.AnthropicChatOptions;
-import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
-import org.springframework.ai.chat.memory.ChatMemory;
-import org.springframework.ai.chat.metadata.Usage;
-import org.springframework.ai.chat.model.ChatResponse;
-import org.springframework.ai.support.ToolCallbacks;
-import org.springframework.stereotype.Service;
-
 import com.anthropic.models.messages.OutputConfig;
 import com.nguyenvu.lopet.common.exception.ServiceUnavailableException;
 import com.nguyenvu.lopet.llms.dto.LLMDtos;
+import org.springframework.ai.anthropic.AnthropicChatModel;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.metadata.Usage;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.stereotype.Service;
+
+import static org.springframework.ai.anthropic.AnthropicChatOptions.builder;
 
 @Service
 public class LLMService {
@@ -29,41 +23,26 @@ public class LLMService {
             Answer concisely in English.
             """;
 
-    private final ChatClient chatClient;
-    private final ChatMemory chatMemory;
-    private final List<LLMDtos.ToolInfo> tools;
+    private final ChatClient chatClientWithTools;
 
     public LLMService(ChatClient.Builder builder,
-                      ChatMemory chatMemory,
                       AccountTool accountTool,
-                      StatisticTool statisticTool) {
-        Object[] toolBeans = {accountTool, statisticTool};
-
-        this.chatMemory = chatMemory;
-        this.tools = Arrays.stream(ToolCallbacks.from(toolBeans))
-                .map(callback -> new LLMDtos.ToolInfo(
-                        callback.getToolDefinition().name(),
-                        callback.getToolDefinition().description()))
-                .toList();
-        this.chatClient = builder
+                      StatisticTool statisticTool,
+                      AnthropicChatModel anthropicChatModel) {
+        this.chatClientWithTools = builder
                 .defaultSystem(SYSTEM_PROMPT)
-                .defaultTools(toolBeans)
-                .defaultAdvisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
-                .defaultOptions(AnthropicChatOptions.builder()
+                .defaultTools(accountTool, statisticTool)
+                .defaultOptions(builder()
                         .effort(OutputConfig.Effort.MEDIUM)
                 )
                 .build();
     }
 
-    public LLMDtos.AskResponse ask(String message, String conversationId) {
-        String resolvedId = conversationId == null || conversationId.isBlank()
-                ? UUID.randomUUID().toString()
-                : conversationId;
+    public LLMDtos.AskResponse ask(String message) {
 
         long startedAt = System.currentTimeMillis();
-        ChatResponse response = chatClient.prompt()
+        ChatResponse response = chatClientWithTools.prompt()
                 .user(message)
-                .advisors(advisor -> advisor.param(ChatMemory.CONVERSATION_ID, resolvedId))
                 .call()
                 .chatResponse();
 
@@ -71,17 +50,10 @@ public class LLMService {
             throw new ServiceUnavailableException("The assistant returned no content");
         }
 
-        return new LLMDtos.AskResponse(resolvedId, response.getResult().getOutput().getText(),
+        return new LLMDtos.AskResponse(response.getResult().getOutput().getText(),
                 usageOf(response, System.currentTimeMillis() - startedAt));
     }
 
-    public LLMDtos.ToolListResponse listTools() {
-        return new LLMDtos.ToolListResponse(tools.size(), tools);
-    }
-
-    public void clearConversation(String conversationId) {
-        chatMemory.clear(conversationId);
-    }
 
     private LLMDtos.ModelUsage usageOf(ChatResponse response, long latencyMs) {
         Usage usage = response.getMetadata() == null ? null : response.getMetadata().getUsage();

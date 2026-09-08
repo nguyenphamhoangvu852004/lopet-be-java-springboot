@@ -26,17 +26,6 @@ public class LLMController {
     @PostMapping("/chat")
     public ApiResponse<LLMDtos.AskResponse> chat(@Valid @RequestBody LLMDtos.AskRequest request) {
         return ApiResponse.ok("Ask assistant successfully",
-                llmService.ask(request.message(), request.conversationId()));
-    }
-
-    @GetMapping("/tools")
-    public ApiResponse<LLMDtos.ToolListResponse> getTools() {
-        return ApiResponse.ok("Get assistant tools successfully", llmService.listTools());
-    }
-
-    @DeleteMapping("/conversations/{conversationId}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void clearConversation(@PathVariable String conversationId) {
-        llmService.clearConversation(conversationId);
+                llmService.ask(request.message()));
     }
 }

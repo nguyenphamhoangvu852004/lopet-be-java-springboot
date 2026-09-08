@@ -36,16 +36,6 @@ public final class PostDtos {
             LocalDateTime updatedAt) {
     }
 
-    public record PostSuggestItem(
-            Integer postId,
-            Integer accountId,
-            String content,
-            List<MediaWithoutId> postMedias,
-            Integer likeAmount,
-            LocalDateTime createdAt,
-            LocalDateTime updatedAt) {
-    }
-
     public record PostDetail(
             Integer postId,
             Integer accountId,

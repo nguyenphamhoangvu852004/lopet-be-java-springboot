@@ -1,5 +1,7 @@
 package com.nguyenvu.lopet.account.entity;
 
+import com.nguyenvu.lopet.role.Role;
+import jakarta.persistence.*;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.annotations.SQLRestriction;
@@ -7,16 +9,6 @@ import org.hibernate.annotations.SQLRestriction;
 import com.nguyenvu.lopet.accountprofile.entity.AccountProfile;
 import com.nguyenvu.lopet.common.entity.BaseEntity;
 
-import jakarta.persistence.CascadeType;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.OneToOne;
-import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -54,4 +46,7 @@ public class Account extends BaseEntity {
     @JoinColumn(name = "account_profile_id")
     @OnDelete(action = OnDeleteAction.CASCADE)
     private AccountProfile accountProfile;
+
+    @ManyToOne
+    private Role role;
 }

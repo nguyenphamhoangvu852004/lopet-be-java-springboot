@@ -10,29 +10,14 @@ import com.nguyenvu.lopet.post.entity.PostMedia;
 
 public final class PostMapper {
 
-    private static Integer accountIdOf(Post post) {
-        return post.getAccount() == null ? null : post.getAccount().getId();
-    }
-
     public static PostDtos.PostListItem toListItem(Post post) {
         return new PostDtos.PostListItem(
                 post.getId(),
-                accountIdOf(post),
+                post.authorId(),
                 post.getContent(),
-                mediasWithId(post),
-                post.getPostLikes().size(),
+                toMediasWithId(post),
+                post.likeCount(),
                 likedAccounts(post),
-                post.getCreatedAt(),
-                post.getUpdatedAt());
-    }
-
-    public static PostDtos.PostSuggestItem toSuggestItem(Post post) {
-        return new PostDtos.PostSuggestItem(
-                post.getId(),
-                accountIdOf(post),
-                post.getContent(),
-                mediasWithoutId(post),
-                post.getPostLikes().size(),
                 post.getCreatedAt(),
                 post.getUpdatedAt());
     }
@@ -40,10 +25,10 @@ public final class PostMapper {
     public static PostDtos.PostDetail toDetail(Post post) {
         return new PostDtos.PostDetail(
                 post.getId(),
-                accountIdOf(post),
+                post.authorId(),
                 post.getContent(),
-                mediasWithId(post),
-                post.getPostLikes().size(),
+                toMediasWithId(post),
+                post.likeCount(),
                 likedAccounts(post),
                 post.getCreatedAt(),
                 post.getUpdatedAt());
@@ -54,7 +39,7 @@ public final class PostMapper {
                 post.getId(),
                 post.getContent(),
                 mediasWithoutId(post),
-                post.getPostLikes().size(),
+                post.likeCount(),
                 post.getCreatedAt(),
                 post.getUpdatedAt());
     }
@@ -64,19 +49,15 @@ public final class PostMapper {
                 media.getCreatedAt(), media.getUpdatedAt());
     }
 
-    private static List<PostDtos.MediaWithId> mediasWithId(Post post) {
-        return sortedMedias(post).map(PostMapper::toMediaWithId).toList();
+    public static List<PostDtos.MediaWithId> toMediasWithId(Post post) {
+        return post.mediasSorted().stream().map(PostMapper::toMediaWithId).toList();
     }
 
     private static List<PostDtos.MediaWithoutId> mediasWithoutId(Post post) {
-        return sortedMedias(post)
+        return post.mediasSorted().stream()
                 .map(media -> new PostDtos.MediaWithoutId(media.getMediaUrl(), media.getMediaType(),
                         media.getCreatedAt(), media.getUpdatedAt()))
                 .toList();
-    }
-
-    private static java.util.stream.Stream<PostMedia> sortedMedias(Post post) {
-        return post.getPostMedias().stream().sorted(Comparator.comparing(PostMedia::getId));
     }
 
     private static List<PostDtos.LikedAccount> likedAccounts(Post post) {
