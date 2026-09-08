@@ -2,6 +2,8 @@ package com.nguyenvu.lopet.accountprofile;
 
 import java.time.LocalDate;
 
+import com.nguyenvu.lopet.upload.Images;
+import com.nguyenvu.lopet.upload.UploadKind;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -13,7 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.nguyenvu.lopet.accountprofile.dto.AccountProfileDtos;
-import com.nguyenvu.lopet.common.media.CloudinaryService;
+import com.nguyenvu.lopet.upload.CloudinaryService;
 import com.nguyenvu.lopet.common.response.ApiResponse;
 import com.nguyenvu.lopet.security.Auth;
 import com.nguyenvu.lopet.security.CurrentUser;
@@ -57,7 +59,7 @@ public class AccountProfileController {
     }
 
     private String uploadOrNull(MultipartFile file) {
-        return file == null || file.isEmpty() ? null : cloudinaryService.uploadImage(file);
+        return file == null || file.isEmpty() ? null : cloudinaryService.upload(file, UploadKind.IMAGE);
     }
 
     private LocalDate parseDate(String value) {

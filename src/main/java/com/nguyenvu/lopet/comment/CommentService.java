@@ -75,7 +75,7 @@ public class CommentService {
                 .orElseThrow(() -> new BadRequestException("No comment found"));
 
         // Only the comment author or the post owner may delete — replaces the removed ReBAC rule.
-        if (!callerId.equals(authorIdOf(comment)) && !callerId.equals(ownerAccountIdOf(comment.getPost()))) {
+        if (!callerId.equals(authorIdOf(comment)) && !isPostOwner(comment, callerId)) {
             throw new ForbiddenException("You are not allowed to delete this comment");
         }
 
@@ -108,8 +108,8 @@ public class CommentService {
                 comment.getText(), comment.getImages(), comment.getCreatedAt());
     }
 
-    private Integer ownerAccountIdOf(Post post) {
-        return post == null || post.getAccount() == null ? null : post.getAccount().getId();
+    private boolean isPostOwner(Comment comment, Integer callerId) {
+        return comment.getPost() != null && comment.getPost().isOwnedBy(callerId);
     }
 
     private Integer authorIdOf(Comment comment) {

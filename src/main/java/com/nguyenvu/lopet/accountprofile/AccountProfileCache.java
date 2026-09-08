@@ -41,13 +41,7 @@ public class AccountProfileCache {
         redis.opsForValue().set(summaryKey(accountId), jsonMapper.writeValueAsString(summary), SUMMARY_TTL);
     }
 
-    /**
-     * Một khoá phẳng cho mỗi tài khoản.
-     *
-     * Bản trước là hash chia theo người xem, vì cùng một hồ sơ hiện ra khác nhau
-     * tuỳ quan hệ. Không còn lọc theo người xem thì mọi người thấy đúng một bản,
-     * và giữ chiều `viewerId` chỉ nhân bản cùng một giá trị lên n lần trong Redis.
-     */
+
     public AccountProfileDtos.PublicProfile findPublic(Integer accountId) {
         String cached = redis.opsForValue().get(publicKey(accountId));
         return cached == null ? null : jsonMapper.readValue(cached, AccountProfileDtos.PublicProfile.class);

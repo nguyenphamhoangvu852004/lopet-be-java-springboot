@@ -1,33 +1,27 @@
 package com.nguyenvu.lopet.post;
 
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
-
-import com.nguyenvu.lopet.post.dto.CursorPage;
-import com.nguyenvu.lopet.post.dto.OffsetPage;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import com.nguyenvu.lopet.account.entity.Account;
 import com.nguyenvu.lopet.account.repository.AccountRepository;
 import com.nguyenvu.lopet.common.exception.BadRequestException;
-import com.nguyenvu.lopet.common.exception.ForbiddenException;
 import com.nguyenvu.lopet.common.exception.NotFoundException;
+import com.nguyenvu.lopet.post.dto.CursorPage;
+import com.nguyenvu.lopet.post.dto.OffsetPage;
 import com.nguyenvu.lopet.post.dto.PostDtos;
 import com.nguyenvu.lopet.post.entity.MediaType;
 import com.nguyenvu.lopet.post.entity.Post;
 import com.nguyenvu.lopet.post.entity.PostLike;
-import com.nguyenvu.lopet.post.entity.PostMedia;
 import com.nguyenvu.lopet.post.repository.PostLikeRepository;
-import com.nguyenvu.lopet.post.repository.PostMediaRepository;
 import com.nguyenvu.lopet.post.repository.PostRepository;
-
+import com.nguyenvu.lopet.upload.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -36,34 +30,31 @@ public class PostService {
     private static final int MAX_PAGE_SIZE = 100;
 
     private final PostRepository postRepository;
-    private final PostMediaRepository postMediaRepository;
     private final PostLikeRepository postLikeRepository;
     private final AccountRepository accountRepository;
+    private final CloudinaryService cloudinaryService;
 
-    @Transactional(readOnly = true)
-    public List<PostDtos.PostSuggestItem> getSuggestList() {
-        List<Integer> ids = postRepository.findIdsMatching(null, PageRequest.of(0, SUGGEST_SIZE));
-        if (ids.isEmpty()) {
-            return List.of();
-        }
-        return postRepository.findAllByIdsWithDetails(ids).stream()
-                .map(PostMapper::toSuggestItem)
-                .toList();
+    private static MediaType toMediaType(UploadKind kind) {
+        return kind == UploadKind.VIDEO ? MediaType.VIDEO : MediaType.IMAGE;
     }
 
     @Transactional(readOnly = true)
-    public CursorPage<PostDtos.PostListItem> getAllByCursorStrategy(Integer lastCursor,int size) {
-        Pageable pageable  = PageRequest.of(0,size+1);
-        List<Post> listPost = this.postRepository.fetchNextPage(lastCursor,pageable);
+    public CursorPage<PostDtos.PostListItem> getAllByCursorStrategy(Integer lastCursor, int size) {
+        if (size < 1 || size > MAX_PAGE_SIZE) {
+            throw new BadRequestException("size must be between 1 and " + MAX_PAGE_SIZE);
+        }
+
+        Pageable pageable = PageRequest.of(0, size + 1);
+        List<Post> listPost = this.postRepository.fetchNextPage(lastCursor, pageable);
 
         boolean hasNext = listPost.size() > size;
         if (hasNext) {
-            listPost = listPost.subList(0,size);
+            listPost = listPost.subList(0, size);
         }
         List<PostDtos.PostListItem> resDto = listPost.stream().map(PostMapper::toListItem).collect(Collectors.toList());
 
-        Integer nextCursor = hasNext && !listPost.isEmpty() ? listPost.get(listPost.size() -1).getId() : null;
-        return new CursorPage<>(resDto,nextCursor, hasNext);
+        Integer nextCursor = hasNext && !listPost.isEmpty() ? listPost.get(listPost.size() - 1).getId() : null;
+        return new CursorPage<>(resDto, nextCursor, hasNext);
     }
 
     @Transactional(readOnly = true)
@@ -89,8 +80,7 @@ public class PostService {
 
     @Transactional(readOnly = true)
     public PostDtos.PostDetail getOneById(Integer id) {
-        Post post = postRepository.findDetailById(id).orElseThrow(NotFoundException::new);
-        return PostMapper.toDetail(post);
+        return PostMapper.toDetail(requirePost(id));
     }
 
     @Transactional(readOnly = true)
@@ -102,109 +92,72 @@ public class PostService {
 
     @Transactional
     public PostDtos.CreatePostResponse create(Integer accountId, String content,
-                                               List<UploadedMedia> medias) {
-        Account account = accountRepository.findById(accountId).orElseThrow(BadRequestException::new);
+                                              MultipartFile[] images, MultipartFile[] videos) {
+        Account author = accountRepository.findById(accountId)
+                .orElseThrow(() -> new BadRequestException("No account found"));
 
-        Post saved = postRepository.save(Post.builder()
-                .account(account)
-                .content(content)
-                .build());
+        Post post = Post.create(author, content);
 
-        List<PostDtos.MediaWithId> savedMedias = new ArrayList<>();
-        for (UploadedMedia media : medias) {
-            PostMedia entity = postMediaRepository.save(PostMedia.builder()
-                    .post(saved)
-                    .mediaUrl(media.url())
-                    .mediaType(media.type())
-                    .build());
-            savedMedias.add(PostMapper.toMediaWithId(entity));
-        }
+        List<UploadedFile> listImagesUploaded = cloudinaryService.upload(new Images(images));
+        listImagesUploaded.forEach(file -> post.addMedia(file.url(), toMediaType(file.kind())));
 
-        LocalDateTime now = LocalDateTime.now();
-        return new PostDtos.CreatePostResponse(saved.getAccount().getId(), saved.getId(),
-                saved.getContent(), savedMedias, now, now);
+        List<UploadedFile> listVideoUploaded = cloudinaryService.upload(new Videos(videos));
+        listVideoUploaded.forEach(file -> post.addMedia(file.url(), toMediaType(file.kind())));
+
+
+        Post saved = postRepository.saveAndFlush(post);
+
+        return new PostDtos.CreatePostResponse(saved.authorId(), saved.getId(), saved.getContent(),
+                PostMapper.toMediasWithId(saved), saved.getCreatedAt(), saved.getUpdatedAt());
     }
 
     @Transactional
     public PostDtos.UpdatePostResponse update(Integer postId, Integer callerId, String content,
-                                               List<Integer> keepMediaIds, List<UploadedMedia> newMedias) {
-        Post post = postRepository.findDetailById(postId)
-                .orElseThrow(() -> new BadRequestException("Post not found"));
+                                              List<Integer> keepMediaIds, MultipartFile[] images,
+                                              MultipartFile[] videos) {
+        Post post = requirePost(postId);
 
-        if (!callerId.equals(ownerAccountIdOf(post))) {
-            throw new ForbiddenException("You are not the owner of this post");
+        post.editContentBy(callerId, content);
+        post.keepOnlyMedia(keepMediaIds);
+        for (UploadedFile media : cloudinaryService.upload(new Images(images), new Videos(videos))) {
+            post.addMedia(media.url(), toMediaType(media.kind()));
         }
+        post.requirePublishable();
 
-        post.setContent(content);
+        Post updated = postRepository.saveAndFlush(post);
 
-        Post updated = postRepository.save(post);
-
-        List<PostDtos.MediaWithId> result = new ArrayList<>();
-        if (keepMediaIds == null) {
-            postMediaRepository.findByPostId(postId).forEach(media -> result.add(PostMapper.toMediaWithId(media)));
-        } else {
-            Map<Integer, PostMedia> current = postMediaRepository.findByPostId(postId).stream()
-                    .collect(Collectors.toMap(PostMedia::getId, media -> media));
-
-            for (Integer id : keepMediaIds) {
-                PostMedia media = current.get(id);
-                if (media == null) {
-                    throw new BadRequestException("Old media not found: ID " + id);
-                }
-                result.add(PostMapper.toMediaWithId(media));
-            }
-
-            if (keepMediaIds.isEmpty()) {
-                postMediaRepository.deleteAllByPostId(postId);
-            } else {
-                postMediaRepository.deleteByPostIdAndIdNotIn(postId, keepMediaIds);
-            }
-            postMediaRepository.flush();
-        }
-        for (UploadedMedia media : newMedias) {
-            PostMedia entity = postMediaRepository.save(PostMedia.builder()
-                    .post(updated)
-                    .mediaUrl(media.url())
-                    .mediaType(media.type())
-                    .build());
-            result.add(PostMapper.toMediaWithId(entity));
-        }
-
-        return new PostDtos.UpdatePostResponse(ownerAccountIdOf(updated), updated.getId(),
-                updated.getContent(), result,
-                updated.getCreatedAt(), LocalDateTime.now());
+        return new PostDtos.UpdatePostResponse(updated.authorId(), updated.getId(), updated.getContent(),
+                PostMapper.toMediasWithId(updated), updated.getCreatedAt(), updated.getUpdatedAt());
     }
 
     @Transactional
     public PostDtos.DeletePostResponse delete(Integer postId, Integer callerId) {
-        Post post = postRepository.findById(postId).orElseThrow(BadRequestException::new);
+        Post post = postRepository.findById(postId).orElseThrow(() -> new NotFoundException("Post not found"));
 
-        if (!callerId.equals(ownerAccountIdOf(post))) {
-            throw new ForbiddenException("You are not the owner of this post");
-        }
+        post.softDelete(callerId);
+        postRepository.save(post);
 
-        postRepository.delete(post);
         return new PostDtos.DeletePostResponse(postId);
     }
 
     @Transactional
     public PostDtos.ReactResponse like(Integer postId, Integer accountId) {
-        Post post = postRepository.findDetailById(postId).orElseThrow(BadRequestException::new);
-        Account account = accountRepository.findById(accountId).orElseThrow(BadRequestException::new);
+        Post post = requirePost(postId);
+        Account account = requireAccount(accountId);
 
         if (postLikeRepository.findByAccountAndPost(account.getId(), post.getId()).isPresent()) {
             return new PostDtos.ReactResponse("You have already liked this post");
         }
 
-        postLikeRepository.save(PostLike.builder().post(post).account(account).build());
+        postLikeRepository.save(PostLike.of(post, account));
 
         return new PostDtos.ReactResponse("Like post successfully");
     }
 
     @Transactional
     public PostDtos.ReactResponse unlike(Integer postId, Integer accountId) {
-        Post post = postRepository.findDetailById(postId).orElseThrow(BadRequestException::new);
-        Account account = accountRepository.findById(accountId).orElseThrow(BadRequestException::new);
+        Post post = requirePost(postId);
+        Account account = requireAccount(accountId);
 
         PostLike existing = postLikeRepository.findByAccountAndPost(account.getId(), post.getId())
                 .orElse(null);
@@ -216,10 +169,13 @@ public class PostService {
         return new PostDtos.ReactResponse("Unlike post successfully");
     }
 
-    private Integer ownerAccountIdOf(Post post) {
-        return post.getAccount() == null ? null : post.getAccount().getId();
+    private Post requirePost(Integer postId) {
+        return postRepository.findDetailById(postId)
+                .orElseThrow(() -> new NotFoundException("Post not found"));
     }
 
-    public record UploadedMedia(String url, MediaType type) {
+    private Account requireAccount(Integer accountId) {
+        return accountRepository.findById(accountId)
+                .orElseThrow(() -> new BadRequestException("No account found"));
     }
 }

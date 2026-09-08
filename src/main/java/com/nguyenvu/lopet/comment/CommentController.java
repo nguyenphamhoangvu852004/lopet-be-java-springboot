@@ -1,5 +1,6 @@
 package com.nguyenvu.lopet.comment;
 
+import com.nguyenvu.lopet.upload.UploadKind;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -13,7 +14,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-import com.nguyenvu.lopet.common.media.CloudinaryService;
+import com.nguyenvu.lopet.upload.CloudinaryService;
 import com.nguyenvu.lopet.common.response.ApiResponse;
 import com.nguyenvu.lopet.comment.dto.CommentDtos;
 import com.nguyenvu.lopet.security.Auth;
@@ -37,7 +38,7 @@ public class CommentController {
             @RequestParam(required = false) String postId,
             @RequestParam(required = false) String replyCommentId,
             @RequestPart(name = "image", required = false) MultipartFile image) {
-        String imageUrl = image == null || image.isEmpty() ? "" : cloudinaryService.uploadImage(image);
+        String imageUrl = image == null || image.isEmpty() ? "" : cloudinaryService.upload(image, UploadKind.IMAGE);
         return created(content, postId, replyCommentId, imageUrl);
     }
 

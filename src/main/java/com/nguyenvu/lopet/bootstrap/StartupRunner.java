@@ -15,12 +15,15 @@ public class StartupRunner implements ApplicationRunner {
     private final AdminInitializer adminInitializer;
     private final SeedDemoAccount seedDemoAccount;
     private final SeedDemoPosts seedDemoPosts;
-
+    private final SeedDemoRoleAndPermission seedDemoRoleAndPermission;
     @Value("${lopet.bootstrap.seed-demo:false}")
     private boolean seedDemo;
 
     @Override
     public void run(ApplicationArguments args) {
+
+        seedDemoRoleAndPermission.execute();
+
         adminInitializer.execute();
 
         if (!seedDemo) {
