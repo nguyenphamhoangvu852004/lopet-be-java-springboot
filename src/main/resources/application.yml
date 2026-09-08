@@ -1,6 +1,6 @@
 server:
   port: ${APP_PORT:8080}
-
+  forward-headers-strategy: framework
 spring:
   rabbitmq:
     host: ${RABBIT_MQ_HOST}
