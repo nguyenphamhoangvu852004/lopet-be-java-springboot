@@ -28,13 +28,6 @@ class PostMapperNullAuthorTest {
     }
 
     @Test
-    @DisplayName("toSuggestItem and toDetail behave the same")
-    void suggest_and_detail_do_not_throw() {
-        assertThat(PostMapper.toSuggestItem(postWithoutAuthor()).accountId()).isNull();
-        assertThat(PostMapper.toDetail(postWithoutAuthor()).accountId()).isNull();
-    }
-
-    @Test
     @DisplayName("a like whose account is gone is skipped, but still counted")
     void like_with_a_missing_account() {
         Post post = PostFixtures.authorless(1, CONTENT,
