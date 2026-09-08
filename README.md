@@ -8,7 +8,7 @@ Deploy: https://api.nguyenvu.io.vn/swagger-ui.html
 ## Tech Stack
 **Backend:** Spring Boot 4, MySQL, Redis
 
-**Messaging:** Kafka, RabbitMQ
+**Messaging:** RabbitMQ
 
 **AI:** Claude API (tool-calling for sensitive content review)
 
