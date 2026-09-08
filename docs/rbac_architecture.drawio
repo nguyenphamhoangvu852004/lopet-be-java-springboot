@@ -1,0 +1,220 @@
+<mxfile host="Electron">
+  <diagram name="Page-1" id="IOVVY9pNEDzeGO-jMXQU">
+    <mxGraphModel dx="1178" dy="1801" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-10" edge="1" parent="1" source="tvGNFmRXMY15O1pkUnjT-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="tvGNFmRXMY15O1pkUnjT-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-11" edge="1" parent="1" source="tvGNFmRXMY15O1pkUnjT-1" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="tvGNFmRXMY15O1pkUnjT-3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-1" parent="1" style="whiteSpace=wrap;html=1;" value="user 1" vertex="1">
+          <mxGeometry height="60" width="120" x="20" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-2" parent="1" style="whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" value="permission 1" vertex="1">
+          <mxGeometry height="60" width="120" x="330" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-3" parent="1" style="whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" value="permission 2" vertex="1">
+          <mxGeometry height="60" width="120" x="330" y="110" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-4" parent="1" style="whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" value="permission 3" vertex="1">
+          <mxGeometry height="60" width="120" x="330" y="230" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-13" edge="1" parent="1" source="tvGNFmRXMY15O1pkUnjT-5" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="tvGNFmRXMY15O1pkUnjT-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-14" edge="1" parent="1" source="tvGNFmRXMY15O1pkUnjT-5" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="tvGNFmRXMY15O1pkUnjT-4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-5" parent="1" style="whiteSpace=wrap;html=1;" value="user 2" vertex="1">
+          <mxGeometry height="60" width="120" x="20" y="100" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-15" edge="1" parent="1" source="tvGNFmRXMY15O1pkUnjT-6" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="tvGNFmRXMY15O1pkUnjT-3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-16" edge="1" parent="1" source="tvGNFmRXMY15O1pkUnjT-6" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="tvGNFmRXMY15O1pkUnjT-4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-6" parent="1" style="whiteSpace=wrap;html=1;" value="user 3" vertex="1">
+          <mxGeometry height="60" width="120" x="20" y="220" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-73" edge="1" parent="1" source="tvGNFmRXMY15O1pkUnjT-9" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="tvGNFmRXMY15O1pkUnjT-31">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-9" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="Problem&lt;div&gt;Tradditional authorization got a huge amount of record when adding one user&lt;/div&gt;" vertex="1">
+          <mxGeometry height="60" width="450" x="10" y="-80" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-12" edge="1" parent="1" source="tvGNFmRXMY15O1pkUnjT-1" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="tvGNFmRXMY15O1pkUnjT-4">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="180" y="60" as="sourcePoint" />
+            <mxPoint x="370" y="128" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-43" edge="1" parent="1" source="tvGNFmRXMY15O1pkUnjT-20" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="tvGNFmRXMY15O1pkUnjT-33">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-46" edge="1" parent="1" source="tvGNFmRXMY15O1pkUnjT-20" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="tvGNFmRXMY15O1pkUnjT-34">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-20" parent="1" style="whiteSpace=wrap;html=1;" value="user 1" vertex="1">
+          <mxGeometry height="60" width="120" x="710" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-21" parent="1" style="whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" value="permission 1" vertex="1">
+          <mxGeometry height="60" width="120" x="1170" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-22" parent="1" style="whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" value="permission 2" vertex="1">
+          <mxGeometry height="60" width="120" x="1170" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-23" parent="1" style="whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" value="permission 3" vertex="1">
+          <mxGeometry height="60" width="120" x="1170" y="230" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-44" edge="1" parent="1" source="tvGNFmRXMY15O1pkUnjT-26" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="tvGNFmRXMY15O1pkUnjT-34">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-26" parent="1" style="whiteSpace=wrap;html=1;" value="user 2" vertex="1">
+          <mxGeometry height="60" width="120" x="710" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-45" edge="1" parent="1" source="tvGNFmRXMY15O1pkUnjT-29" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="tvGNFmRXMY15O1pkUnjT-35">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-29" parent="1" style="whiteSpace=wrap;html=1;" value="user 3" vertex="1">
+          <mxGeometry height="60" width="120" x="710" y="240" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-74" edge="1" parent="1" source="tvGNFmRXMY15O1pkUnjT-31" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="tvGNFmRXMY15O1pkUnjT-72">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-31" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="Resolve&lt;div&gt;assign role to user&lt;/div&gt;" vertex="1">
+          <mxGeometry height="60" width="580" x="710" y="-170" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-36" edge="1" parent="1" source="tvGNFmRXMY15O1pkUnjT-33" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="tvGNFmRXMY15O1pkUnjT-21">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-37" edge="1" parent="1" source="tvGNFmRXMY15O1pkUnjT-33" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="tvGNFmRXMY15O1pkUnjT-22">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-33" parent="1" style="whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" value="role 1" vertex="1">
+          <mxGeometry height="60" width="120" x="940" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-39" edge="1" parent="1" source="tvGNFmRXMY15O1pkUnjT-34" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="tvGNFmRXMY15O1pkUnjT-21">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-40" edge="1" parent="1" source="tvGNFmRXMY15O1pkUnjT-34" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="tvGNFmRXMY15O1pkUnjT-23">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-34" parent="1" style="whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" value="role 1" vertex="1">
+          <mxGeometry height="60" width="120" x="940" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-42" edge="1" parent="1" source="tvGNFmRXMY15O1pkUnjT-35" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="tvGNFmRXMY15O1pkUnjT-21">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-35" parent="1" style="whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" value="role 1" vertex="1">
+          <mxGeometry height="60" width="120" x="940" y="240" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-38" edge="1" parent="1" source="tvGNFmRXMY15O1pkUnjT-33" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="tvGNFmRXMY15O1pkUnjT-23">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-41" edge="1" parent="1" source="tvGNFmRXMY15O1pkUnjT-35" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="tvGNFmRXMY15O1pkUnjT-22">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1110" y="210" as="sourcePoint" />
+            <mxPoint x="1220" y="262" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-47" edge="1" parent="1" source="tvGNFmRXMY15O1pkUnjT-20" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="tvGNFmRXMY15O1pkUnjT-35">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="870" y="130" as="sourcePoint" />
+            <mxPoint x="985" y="190" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-48" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="RBAC - level 0" vertex="1">
+          <mxGeometry height="60" width="120" x="710" y="-250" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-93" edge="1" parent="1" source="tvGNFmRXMY15O1pkUnjT-51" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="tvGNFmRXMY15O1pkUnjT-62">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-51" parent="1" style="whiteSpace=wrap;html=1;" value="user 1" vertex="1">
+          <mxGeometry height="60" width="120" x="1470" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-52" parent="1" style="whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" value="permission 1" vertex="1">
+          <mxGeometry height="60" width="120" x="1880" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-53" parent="1" style="whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" value="permission 2" vertex="1">
+          <mxGeometry height="60" width="120" x="1880" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-54" parent="1" style="whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" value="permission 3" vertex="1">
+          <mxGeometry height="60" width="120" x="1880" y="230" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-56" parent="1" style="whiteSpace=wrap;html=1;" value="user 2" vertex="1">
+          <mxGeometry height="60" width="120" x="1470" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-99" edge="1" parent="1" source="tvGNFmRXMY15O1pkUnjT-58" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="tvGNFmRXMY15O1pkUnjT-67">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-58" parent="1" style="whiteSpace=wrap;html=1;" value="user 3" vertex="1">
+          <mxGeometry height="60" width="120" x="1470" y="240" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-101" edge="1" parent="1" source="tvGNFmRXMY15O1pkUnjT-59" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="tvGNFmRXMY15O1pkUnjT-92">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-59" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="Resolve&lt;div&gt;Use inheritence mindset&lt;/div&gt;" vertex="1">
+          <mxGeometry height="60" width="580" x="1460" y="-250" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-62" parent="1" style="whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" value="role ADMIN" vertex="1">
+          <mxGeometry height="60" width="120" x="1700" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-64" edge="1" parent="1" source="tvGNFmRXMY15O1pkUnjT-65" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="tvGNFmRXMY15O1pkUnjT-54">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-65" parent="1" style="whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" value="role MORDERATOR" vertex="1">
+          <mxGeometry height="60" width="120" x="1700" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-66" edge="1" parent="1" source="tvGNFmRXMY15O1pkUnjT-67" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="tvGNFmRXMY15O1pkUnjT-52">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-67" parent="1" style="whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" value="role COMMON" vertex="1">
+          <mxGeometry height="60" width="120" x="1700" y="240" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-69" edge="1" parent="1" source="tvGNFmRXMY15O1pkUnjT-67" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="tvGNFmRXMY15O1pkUnjT-53">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1870" y="210" as="sourcePoint" />
+            <mxPoint x="1980" y="262" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-71" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="RBAC - level 1" vertex="1">
+          <mxGeometry height="60" width="120" x="1450" y="-350" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-75" edge="1" parent="1" source="tvGNFmRXMY15O1pkUnjT-72" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" target="tvGNFmRXMY15O1pkUnjT-59">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-72" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="Problem&lt;div&gt;Still messy with 2 many - to many relationships between users - roles and roles- permissions&lt;/div&gt;" vertex="1">
+          <mxGeometry height="60" width="580" x="710" y="-75" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-84" edge="1" parent="1" source="tvGNFmRXMY15O1pkUnjT-62" style="html=1;verticalAlign=bottom;labelBackgroundColor=none;endArrow=open;endFill=0;dashed=1;rounded=0;" target="tvGNFmRXMY15O1pkUnjT-65" value="&amp;lt;&amp;lt;extend&amp;gt;&amp;gt;">
+          <mxGeometry relative="1" width="160" as="geometry">
+            <mxPoint x="2130" y="-40" as="sourcePoint" />
+            <mxPoint x="2290" y="-40" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-88" parent="1" style="whiteSpace=wrap;html=1;shape=mxgraph.basic.document" value="ADMIN now has all permissions that Morderator and Common role have&lt;div&gt;&lt;br&gt;MODERATOR has all permissions that Common role has&lt;/div&gt;" vertex="1">
+          <mxGeometry height="95" width="225" x="1800" y="-82" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-92" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="Problem&lt;div&gt;&lt;br&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="60" width="580" x="1460" y="-160" as="geometry" />
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-96" edge="1" parent="1" source="tvGNFmRXMY15O1pkUnjT-65" style="html=1;verticalAlign=bottom;labelBackgroundColor=none;endArrow=open;endFill=0;dashed=1;rounded=0;" target="tvGNFmRXMY15O1pkUnjT-67" value="&amp;lt;&amp;lt;extend&amp;gt;&amp;gt;">
+          <mxGeometry relative="1" width="160" as="geometry">
+            <mxPoint x="1760" y="160" as="sourcePoint" />
+            <mxPoint x="1750" y="150" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="tvGNFmRXMY15O1pkUnjT-98" edge="1" parent="1" source="tvGNFmRXMY15O1pkUnjT-56" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="tvGNFmRXMY15O1pkUnjT-65">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1700" y="50" as="sourcePoint" />
+            <mxPoint x="1810" y="70" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

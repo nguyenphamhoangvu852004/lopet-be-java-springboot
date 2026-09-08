@@ -1,0 +1,210 @@
+<mxfile host="Electron">
+  <diagram name="Application Lifecycle" id="R1reAHNuDsHxwRLP-P_-">
+    <mxGraphModel dx="2434" dy="455" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="1250" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="band1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8f8f8;strokeColor=#B3B3B3;verticalAlign=top;align=left;spacingLeft=12;spacingTop=6;fontSize=14;fontColor=#333333;" value="&lt;b&gt;1. Client To Service&lt;/b&gt;" vertex="1">
+          <mxGeometry height="290" width="960" x="-30" y="30" as="geometry" />
+        </mxCell>
+        <mxCell id="band2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8f8f8;strokeColor=#B3B3B3;verticalAlign=top;align=left;spacingLeft=12;spacingTop=6;fontSize=14;fontColor=#333333;" value="&lt;b&gt;2. Bên trong 1 Spring Boot Instance — vòng đời của request&lt;/b&gt; (chi tiết bước 3 → 8)" vertex="1">
+          <mxGeometry height="480" width="1180" x="60" y="340" as="geometry" />
+        </mxCell>
+        <mxCell id="band3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8f8f8;strokeColor=#B3B3B3;verticalAlign=top;align=left;spacingLeft=12;spacingTop=6;fontSize=14;fontColor=#333333;" value="&lt;b&gt;3. Hạ tầng &amp;amp; dịch vụ ngoài&lt;/b&gt;" vertex="1">
+          <mxGeometry height="190" width="1180" x="60" y="860" as="geometry" />
+        </mxCell>
+        <mxCell id="fgroup" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#9673A6;dashed=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=4;fontSize=11;fontColor=#9673A6;" value="Servlet Filter Chain" vertex="1">
+          <mxGeometry height="190" width="560" x="240" y="385" as="geometry" />
+        </mxCell>
+        <mxCell id="sgroup" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#9673A6;dashed=1;verticalAlign=top;align=left;spacingLeft=10;spacingTop=4;fontSize=11;fontColor=#9673A6;" value="Spring Security FilterChainProxy" vertex="1">
+          <mxGeometry height="140" width="385" x="400" y="420" as="geometry" />
+        </mxCell>
+        <mxCell id="extgroup" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#d79b00;dashed=1;verticalAlign=top;align=right;spacingRight=10;spacingTop=4;fontSize=11;fontColor=#d79b00;container=1;collapsible=0;recursiveResize=0;" value="External HTTP APIs" vertex="1">
+          <mxGeometry height="125" width="590" x="640" y="895" as="geometry" />
+        </mxCell>
+        <mxCell id="cloudinary" parent="extgroup" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;" value="&lt;b&gt;Cloudinary&lt;/b&gt;&lt;br&gt;&lt;i&gt;CloudinaryService&lt;/i&gt;" vertex="1">
+          <mxGeometry height="75" width="170" x="15" y="35" as="geometry" />
+        </mxCell>
+        <mxCell id="resend" parent="extgroup" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;" value="&lt;b&gt;Resend&lt;/b&gt;&lt;br&gt;&lt;i&gt;ResendMailSender&lt;/i&gt;" vertex="1">
+          <mxGeometry height="75" width="170" x="205" y="35" as="geometry" />
+        </mxCell>
+        <mxCell id="anthropic" parent="extgroup" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;" value="&lt;b&gt;Anthropic API&lt;/b&gt;&lt;br&gt;&lt;i&gt;Spring AI — LLMService&lt;/i&gt;" vertex="1">
+          <mxGeometry height="75" width="180" x="395" y="35" as="geometry" />
+        </mxCell>
+        <mxCell id="waOYmR8E7VtqqHa-fL2e-2" edge="1" parent="1" source="actor" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="net">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="waOYmR8E7VtqqHa-fL2e-3" connectable="0" parent="waOYmR8E7VtqqHa-fL2e-2" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="1. request (HTTPS)" vertex="1">
+          <mxGeometry relative="1" x="-0.1175" y="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="actor" parent="1" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fontSize=11;" value="Client / Browser" vertex="1">
+          <mxGeometry height="60" width="30" y="135" as="geometry" />
+        </mxCell>
+        <mxCell id="waOYmR8E7VtqqHa-fL2e-4" edge="1" parent="1" source="net" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="actor">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="70" y="190.03" />
+              <mxPoint x="70" y="190.03" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="waOYmR8E7VtqqHa-fL2e-5" connectable="0" parent="waOYmR8E7VtqqHa-fL2e-4" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="5. response (HTTPS)" vertex="1">
+          <mxGeometry relative="1" x="-0.0041" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="waOYmR8E7VtqqHa-fL2e-6" edge="1" parent="1" source="net" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="proxy">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="350" y="150.03" />
+              <mxPoint x="350" y="150.03" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="waOYmR8E7VtqqHa-fL2e-7" connectable="0" parent="waOYmR8E7VtqqHa-fL2e-6" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="2" vertex="1">
+          <mxGeometry relative="1" x="-0.137" y="6" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="net" parent="1" style="ellipse;shape=cloud;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;" value="Internet / DNS&lt;br&gt;&lt;i&gt;xxx.yyy.zzz → A record&lt;/i&gt;" vertex="1">
+          <mxGeometry height="100" width="160" x="170" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="waOYmR8E7VtqqHa-fL2e-9" edge="1" parent="1" source="proxy" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="app1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="waOYmR8E7VtqqHa-fL2e-18" connectable="0" parent="waOYmR8E7VtqqHa-fL2e-9" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="3" vertex="1">
+          <mxGeometry relative="1" x="0.1828" y="-1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="waOYmR8E7VtqqHa-fL2e-13" edge="1" parent="1" source="proxy" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="app2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="waOYmR8E7VtqqHa-fL2e-14" connectable="0" parent="waOYmR8E7VtqqHa-fL2e-13" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="3&#39;" vertex="1">
+          <mxGeometry relative="1" x="0.1272" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="waOYmR8E7VtqqHa-fL2e-15" connectable="0" parent="waOYmR8E7VtqqHa-fL2e-13" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="load balancing" vertex="1">
+          <mxGeometry relative="1" x="-0.6043" y="-2" as="geometry">
+            <mxPoint x="11" y="-12" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="waOYmR8E7VtqqHa-fL2e-16" edge="1" parent="1" source="proxy" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="net">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="360" y="200" />
+              <mxPoint x="360" y="200" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="waOYmR8E7VtqqHa-fL2e-17" connectable="0" parent="waOYmR8E7VtqqHa-fL2e-16" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="4" vertex="1">
+          <mxGeometry relative="1" x="0.2886" y="-1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="proxy" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" value="&lt;b&gt;Web Server / Reverse Proxy&lt;/b&gt;&lt;br&gt;(nginx,caddy)&lt;br&gt;https://xxx.yyy.zzz&lt;b&gt;:443&lt;/b&gt;" vertex="1">
+          <mxGeometry height="90" width="220" x="380" y="125" as="geometry" />
+        </mxCell>
+        <mxCell id="app1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" value="&lt;b&gt;Spring Boot Instance #1&lt;/b&gt;&lt;br&gt;http://xxx&lt;b&gt;:8081&lt;/b&gt;" vertex="1">
+          <mxGeometry height="85" width="230" x="680" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="app2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" value="&lt;b&gt;Spring Boot Instance #2&lt;/b&gt;&lt;br&gt;http://xxx&lt;b&gt;:8082&lt;/b&gt;" vertex="1">
+          <mxGeometry height="85" width="230" x="680" y="195" as="geometry" />
+        </mxCell>
+        <mxCell id="conn" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" value="Tomcat Connector&lt;br&gt;HTTP :8081" vertex="1">
+          <mxGeometry height="70" width="130" x="85" y="470" as="geometry" />
+        </mxCell>
+        <mxCell id="f1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673A6;fontSize=11;" value="LogFilter&lt;br&gt;&lt;i&gt;implements Filter&lt;/i&gt;" vertex="1">
+          <mxGeometry height="70" width="120" x="260" y="470" as="geometry" />
+        </mxCell>
+        <mxCell id="f2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673A6;fontSize=11;" value="CorsFilter → CsrfFilter&lt;br&gt;&lt;i&gt;csrf đang disable&lt;/i&gt;" vertex="1">
+          <mxGeometry height="70" width="170" x="415" y="470" as="geometry" />
+        </mxCell>
+        <mxCell id="f3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673A6;fontSize=10;" value="UsernamePasswordAuth-&lt;br&gt;enticationFilter (formLogin)&lt;br&gt;&lt;i&gt;+ JwtAuthenticationFilter (đang tắt)&lt;/i&gt;" vertex="1">
+          <mxGeometry height="70" width="170" x="600" y="470" as="geometry" />
+        </mxCell>
+        <mxCell id="dispatcher" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" value="DispatcherServlet" vertex="1">
+          <mxGeometry height="70" width="150" x="830" y="470" as="geometry" />
+        </mxCell>
+        <mxCell id="interceptor" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" value="AuthInterceptor&lt;br&gt;&lt;i&gt;HandlerInterceptor, order = 0&lt;/i&gt;" vertex="1">
+          <mxGeometry height="70" width="150" x="830" y="610" as="geometry" />
+        </mxCell>
+        <mxCell id="controller" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" value="Controller&lt;br&gt;&lt;i&gt;@RestController&lt;/i&gt;" vertex="1">
+          <mxGeometry height="70" width="150" x="620" y="610" as="geometry" />
+        </mxCell>
+        <mxCell id="service" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" value="Service&lt;br&gt;&lt;i&gt;@Transactional&lt;/i&gt;" vertex="1">
+          <mxGeometry height="70" width="150" x="410" y="610" as="geometry" />
+        </mxCell>
+        <mxCell id="repo" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" value="Repository&lt;br&gt;&lt;i&gt;Spring Data JPA&lt;/i&gt;" vertex="1">
+          <mxGeometry height="70" width="150" x="200" y="610" as="geometry" />
+        </mxCell>
+        <mxCell id="advice" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" value="GlobalExceptionHandler&lt;br&gt;&lt;i&gt;@RestControllerAdvice&lt;/i&gt;" vertex="1">
+          <mxGeometry height="70" width="190" x="1010" y="700" as="geometry" />
+        </mxCell>
+        <mxCell id="mysql" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" value="&lt;b&gt;MySQL&lt;/b&gt;&lt;br&gt;&lt;i&gt;Hibernate / JPA&lt;/i&gt;" vertex="1">
+          <mxGeometry height="75" width="160" x="90" y="930" as="geometry" />
+        </mxCell>
+        <mxCell id="redis" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" value="&lt;b&gt;Redis&lt;/b&gt;&lt;br&gt;&lt;i&gt;OtpStore, AccountProfileCache&lt;/i&gt;" vertex="1">
+          <mxGeometry height="75" width="160" x="270" y="930" as="geometry" />
+        </mxCell>
+        <mxCell id="rabbit" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" value="&lt;b&gt;RabbitMQ&lt;/b&gt;&lt;br&gt;&lt;i&gt;queue &amp;quot;queueName&amp;quot;&lt;/i&gt;" vertex="1">
+          <mxGeometry height="75" width="160" x="450" y="930" as="geometry" />
+        </mxCell>
+        <mxCell id="legend" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#B3B3B3;align=left;verticalAlign=middle;spacingLeft=12;fontSize=11;" value="&lt;b&gt;Chú thích&lt;/b&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp; ── xanh đậm: luồng &lt;b&gt;request&lt;/b&gt; (1→7)&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp; ┄ xám: luồng &lt;b&gt;response&lt;/b&gt; (8→10)&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp; ── xanh lá: gọi &lt;b&gt;hạ tầng&lt;/b&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp; ┄ đỏ: &lt;b&gt;exception&lt;/b&gt; ném lên advice&lt;br&gt;Ngoài biên là HTTPS, bên trong mạng nội bộ là HTTP thuần — TLS được bóc ở reverse proxy." vertex="1">
+          <mxGeometry height="60" width="1180" x="60" y="1075" as="geometry" />
+        </mxCell>
+        <mxCell id="a1" edge="1" parent="1" source="conn" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;strokeColor=#3333FF;strokeWidth=2;" target="f1" value="4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a2" edge="1" parent="1" source="f1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;strokeColor=#3333FF;strokeWidth=2;" target="f2" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a3" edge="1" parent="1" source="f2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;strokeColor=#3333FF;strokeWidth=2;" target="f3" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a4" edge="1" parent="1" source="f3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;strokeColor=#3333FF;strokeWidth=2;" target="dispatcher" value="5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a5" edge="1" parent="1" source="dispatcher" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;strokeColor=#3333FF;strokeWidth=2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="interceptor" value="6  handler mapping">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a6" edge="1" parent="1" source="interceptor" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;strokeColor=#3333FF;strokeWidth=2;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="controller" value="preHandle → @Auth">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a7" edge="1" parent="1" source="controller" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;strokeColor=#3333FF;strokeWidth=2;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="service" value="7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a8" edge="1" parent="1" source="service" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;strokeColor=#3333FF;strokeWidth=2;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="repo" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a9" edge="1" parent="1" source="service" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;dashed=1;strokeColor=#b85450;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="advice" value="throw exception">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="485" y="735" />
+              <mxPoint x="990" y="735" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="i1" edge="1" parent="1" source="repo" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;strokeColor=#82b366;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="mysql" value="SQL">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="i2" edge="1" parent="1" source="service" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;strokeColor=#82b366;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="redis" value="cache / OTP">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="i3" edge="1" parent="1" source="service" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;strokeColor=#82b366;exitX=0.75;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="rabbit" value="publish (async)">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="i4" edge="1" parent="1" source="service" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=10;strokeColor=#d79b00;exitX=1;exitY=0.75;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="extgroup" value="HTTP client">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="600" y="840" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
